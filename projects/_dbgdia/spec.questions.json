@@ -1,0 +1,26 @@
+﻿[
+    {
+        "question_id":  "body-hole-h1-dia",
+        "component":  "body",
+        "field":  "holes.h1.diameter_mm",
+        "target":  "body.hole.h1.dia",
+        "kind":  "hole_dia",
+        "question":  "Delik \u0027h1\u0027 capi nedir? Ornek: delik 20.",
+        "reason":  "cap olmadan delik acilamaz",
+        "answer":  "10",
+        "source":  "user",
+        "asked_at":  "2026-09-26T21:53:54.8228678Z"
+    },
+    {
+        "question_id":  "body-hole-h1-center",
+        "component":  "body",
+        "field":  "holes.h1.center",
+        "target":  "body.hole.h1.center",
+        "kind":  "hole_center",
+        "question":  "Delik \u0027h1\u0027 merkezi nerede? Ornek: merkez 15,15 (referans koseden mm).",
+        "reason":  "konum kritik; uydurulamaz",
+        "answer":  "15 15",
+        "source":  "user",
+        "asked_at":  "2026-09-26T21:53:54.8550808Z"
+    }
+]

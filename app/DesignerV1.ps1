@@ -555,6 +555,10 @@ $btnCreate.Add_Click({
   $script:pipeRefSpec = ""
   $script:lastProjectDir = Join-Path $projectsDir $script:pipeName
   $script:pipeAnswers = @{}
+  $script:pipeQuestions = @()
+  $txtQuestion.Text = ""
+  $txtAnswer.Text = ""
+  $txtAnswer.Enabled = $false; $btnContinue.Enabled = $false
   Set-Status "analiz ediliyor..."
   Run-Pipeline ""
 })

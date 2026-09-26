@@ -132,7 +132,30 @@ foreach ($case in @(@("T-QA-07", "-5"), @("T-QA-08", "0"))) {
   finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
-# T-QA-09: bosluklu cift
+# T-QA-11/12: center varyantlari
+foreach ($case in @(@("T-QA-11", "15 mm, 15 mm"), @("T-QA-12", "merkez 15 15"), @("T-QA-12b", "15 mm 15 mm"), @("T-QA-12c", "merkez 15,15"))) {
+  $d = New-QADir $case[0]
+  try {
+    $sp = New-QASpec $d $case[0] (New-QABody @((New-QAHole "h1" 10 $null $null "missing")) $null)
+    $r = Invoke-QAAnswer $sp $cenId $case[1]
+    $h = (Get-Content -LiteralPath $sp -Raw | ConvertFrom-Json).components[0].holes[0]
+    $ok = ($r.applied -and [double]$h.center_x_mm -eq 15 -and [double]$h.center_y_mm -eq 15)
+    Add-QAResult $case[0] $ok $(if ($ok) { "kabul: $($case[1])" } else { "hata: $($r.error)" })
+  } catch { Add-QAResult $case[0] $false $_.Exception.Message }
+  finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+# T-QA-13/14/15/16: gecersiz merkezler
+foreach ($case in @(@("T-QA-13", "15"), @("T-QA-14", "-1,15"), @("T-QA-15", "0,15"), @("T-QA-16", "abc"))) {
+  $d = New-QADir $case[0]
+  try {
+    $sp = New-QASpec $d $case[0] (New-QABody @((New-QAHole "h1" 10 $null $null "missing")) $null)
+    $r = Invoke-QAAnswer $sp $cenId $case[1]
+    $ok = (-not $r.applied)
+    Add-QAResult $case[0] $ok $(if ($ok) { "reddedildi: $($r.error)" } else { "yanlis kabul!" })
+  } catch { Add-QAResult $case[0] $false $_.Exception.Message }
+  finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+}
 $d = New-QADir "T-QA-09"
 try {
   $sp = New-QASpec $d "T-QA-09" (New-QABody @((New-QAHole "h1" 10 $null $null "missing")) $null)

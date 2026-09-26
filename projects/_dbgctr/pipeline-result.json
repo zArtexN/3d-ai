@@ -1,0 +1,14 @@
+﻿{
+    "status":  "PASS",
+    "stage":  "done",
+    "provider":  "MOCK",
+    "reason":  "proje tamamlandi",
+    "questions":  [
+
+                  ],
+    "parts":  [
+
+              ],
+    "gcode_available":  false,
+    "gcode_note":  "NOT AVAILABLE - printer profile required"
+}

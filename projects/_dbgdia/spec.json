@@ -1,0 +1,50 @@
+﻿{
+    "project_name":  "_dbgdia",
+    "prompt":  "50x50x10 mm kutu yap, gecisli delik ac.",
+    "metadata":  {
+                     "spec_version":  "2.0"
+                 },
+    "components":  [
+                       {
+                           "id":  "body",
+                           "label":  "ana govde",
+                           "base":  {
+                                        "shape":  "box",
+                                        "width_mm":  50,
+                                        "depth_mm":  50,
+                                        "height_mm":  10
+                                    },
+                           "hollow":  null,
+                           "holes":  [
+                                         {
+                                             "id":  "h1",
+                                             "hole_type":  "through",
+                                             "diameter_mm":  10,
+                                             "center_x_mm":  15,
+                                             "center_y_mm":  15,
+                                             "axis":  "z",
+                                             "depth_mm":  null,
+                                             "cs_dia_mm":  null,
+                                             "cs_depth_mm":  null,
+                                             "cb_dia_mm":  null,
+                                             "cb_depth_mm":  null,
+                                             "screw":  null,
+                                             "status":  "ok"
+                                         }
+                                     ],
+                           "cutouts":  [
+
+                                       ],
+                           "edge_notes":  [
+
+                                          ],
+                           "transforms":  [
+
+                                          ],
+                           "tolerance":  null,
+                           "expected_bbox":  null
+                       }
+                   ],
+    "assembly":  null,
+    "material":  null
+}

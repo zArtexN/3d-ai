@@ -1,0 +1,11 @@
+﻿2026-09-26T21:53:40.0398925Z AI-OK provider=MOCK spec=spec.json
+2026-09-26T21:53:40.2234064Z GATE-NEEDS_INPUT hata=1
+2026-09-26T21:53:40.2292523Z SORU body-hole-h1-dia: Delik 'h1' capi nedir? Ornek: delik 20.
+2026-09-26T21:53:40.2319676Z SORU body-hole-h1-center: Delik 'h1' merkezi nerede? Ornek: merkez 15,15 (referans koseden mm).
+2026-09-26T21:53:46.8746783Z AI-OK provider=MOCK spec=spec.json
+2026-09-26T21:53:47.0940224Z CEVAP body-hole-h1-dia=10
+2026-09-26T21:53:47.1969295Z GATE-NEEDS_INPUT hata=1
+2026-09-26T21:53:47.2026311Z SORU body-hole-h1-center: Delik 'h1' merkezi nerede? Ornek: merkez 15,15 (referans koseden mm).
+2026-09-26T21:53:54.6385003Z AI-OK provider=MOCK spec=spec.json
+2026-09-26T21:53:54.8322975Z CEVAP body-hole-h1-dia=10
+2026-09-26T21:53:54.8605581Z CEVAP body-hole-h1-center=15 15

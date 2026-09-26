@@ -1,0 +1,29 @@
+﻿{
+    "status":  "PASS",
+    "part":  "body",
+    "categories":  {
+                       "geometry":  "PASS",
+                       "feature":  "PASS",
+                       "assembly":  "PASS",
+                       "manufacturability":  "WARNING"
+                   },
+    "bbox_min":  [
+                     0,
+                     0,
+                     0
+                 ],
+    "bbox_max":  [
+                     50,
+                     50,
+                     10
+                 ],
+    "file_bytes":  65015,
+    "hole_checks":  [
+                        {
+                            "id":  "h1",
+                            "result":  "PASS"
+                        }
+                    ],
+    "retries":  0,
+    "detail_head":  "format: ascii (65015 bayt) | bbox: X [0, 50]  Y [0, 50]  Z [0, 10] | facet: 400"
+}

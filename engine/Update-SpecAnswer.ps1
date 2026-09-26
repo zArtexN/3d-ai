@@ -39,6 +39,21 @@ function Parse-One($t) {
   if ($v -le 0) { throw "Olcu pozitif olmali. Girilen: $t" }
   return $v
 }
+function Parse-Center($t, $bw, $bd) {
+  # Deterministik koordinat parseri: SADECE delik merkezi sorulari kullanir.
+  # Kabul: 15,15 | 15 15 | 15 mm, 15 mm | 15 mm 15 mm | merkez 15,15 | merkez 15 15
+  # Red: tek sayi, sayisiz metin, kutu disi/sinir deger (olculer biliniyorsa).
+  $m = [regex]::Match($t, '(-?\d+(?:[.,]\d+)?)\s*(?:mm)?\s*[,;\s]\s*(?:mm)?\s*(-?\d+(?:[.,]\d+)?)')
+  if (-not $m.Success) { throw "Cevap anlasilmadi. Iki sayi bekleniyor (ornek: 15,15 veya 15 15). Girilen: $t" }
+  $x = Get-NumU $m.Groups[1].Value
+  $y = Get-NumU $m.Groups[2].Value
+  if ($bw -gt 0 -and $bd -gt 0) {
+    if ($x -le 0 -or $x -ge $bw -or $y -le 0 -or $y -ge $bd) {
+      throw "Merkez govde disinda: ($x,$y) govde 0..$bw x 0..$bd araliginda olmali. Girilen: $t"
+    }
+  }
+  return @($x, $y)
+}
 
 $qfile = [System.IO.Path]::ChangeExtension($SpecFile, ".questions.json")
 $qs = @()
@@ -97,7 +112,11 @@ if ($kind -eq "dims") {
   $hid = ($target -split '\.')[-2]
   $h = @($comp.holes) | Where-Object { [string]$_.id -eq $hid } | Select-Object -First 1
   if ($null -eq $h) { throw "Delik bulunamadi: $hid" }
-  $p = Parse-Pair $Answer
+  $cbw = 0; $cbd = 0
+  if ($comp.base -and ($comp.base.shape -eq "box" -or $comp.base.shape -eq "rounded_box")) {
+    $cbw = [double]$comp.base.width_mm; $cbd = [double]$comp.base.depth_mm
+  }
+  $p = Parse-Center $Answer $cbw $cbd
   $h.center_x_mm = $p[0]; $h.center_y_mm = $p[1]; $h.status = "ok"
 } elseif ($kind -eq "hole_dia") {
   $hid = ($target -split '\.')[-2]
