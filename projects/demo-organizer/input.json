@@ -1,0 +1,55 @@
+{
+  "project_name": "demo-organizer",
+  "prompt": "MODULER MASAUSTU ORGANIZER: ana govde 120x80x60, kalem bolmesi, telefon bolmesi, kablo gecisi, ayri kapak. Kritik olculer belirtilmedi - uydurma, BLOCKED raporla.",
+  "metadata": { "spec_version": "2.0" },
+  "components": [
+    {
+      "id": "body", "label": "ana govde",
+      "base": { "shape": "box", "width_mm": 120, "depth_mm": 80, "height_mm": 60 },
+      "hollow": { "wall_mm": 2.5, "open_top": true },
+      "holes": [], "cutouts": [], "edge_notes": [],
+      "transforms": [], "tolerance": null, "expected_bbox": null
+    },
+    {
+      "id": "pen", "label": "kalem bolmesi - OLCULER EKSIK",
+      "base": { "shape": "box", "width_mm": null, "depth_mm": null, "height_mm": 50 },
+      "hollow": null,
+      "holes": [], "cutouts": [], "edge_notes": [],
+      "transforms": [], "tolerance": null, "expected_bbox": null
+    },
+    {
+      "id": "phone", "label": "telefon bolmesi - GENISLIK EKSIK",
+      "base": { "shape": "box", "width_mm": null, "depth_mm": 70, "height_mm": 40 },
+      "hollow": null,
+      "holes": [], "cutouts": [], "edge_notes": [],
+      "transforms": [], "tolerance": null, "expected_bbox": null
+    },
+    {
+      "id": "cable", "label": "kablo gecisi - KONUM EKSIK",
+      "base": { "shape": "box", "width_mm": 120, "depth_mm": 80, "height_mm": 60 },
+      "hollow": null,
+      "holes": [],
+      "cutouts": [
+        { "id": "c1", "kind": "slot", "face": "front", "pos_x_mm": null, "pos_y_mm": null, "width_mm": 15, "length_mm": 30, "depth_mm": 10, "status": "missing" }
+      ],
+      "edge_notes": [],
+      "transforms": [], "tolerance": null, "expected_bbox": null
+    },
+    {
+      "id": "lid", "label": "kapak - YUKSEKLIK + BOSLUK EKSIK",
+      "base": { "shape": "box", "width_mm": 120, "depth_mm": 80, "height_mm": null },
+      "hollow": null,
+      "holes": [], "cutouts": [], "edge_notes": [],
+      "transforms": [],
+      "tolerance": { "type": "clearance_fit", "clearance_mm": null, "fit_to": "body", "status": "missing" },
+      "expected_bbox": null
+    }
+  ],
+  "assembly": {
+    "parts": ["body", "pen", "phone", "cable", "lid"],
+    "joints": [
+      { "id": "j1", "type": "sliding_fit", "part_a": "body", "part_b": "lid", "clearance_mm": null, "screw": null }
+    ]
+  },
+  "material": null
+}

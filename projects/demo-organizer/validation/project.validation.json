@@ -1,0 +1,20 @@
+﻿{
+    "status":  "BLOCKED",
+    "reason":  "design validation hatalari",
+    "errors":  [
+                   "(pen) width_mm: pozitif olmali (mevcut: )",
+                   "(pen) depth_mm: pozitif olmali (mevcut: )",
+                   "(phone) width_mm: pozitif olmali (mevcut: )",
+                   "(cable) kesik \u0027c1\u0027: olcu/konum eksik (status=missing) -\u003e model olusturulamaz",
+                   "(lid) height_mm: pozitif olmali (mevcut: )",
+                   "(lid) tolerans kritik olcu eksik (status=missing) -\u003e model olusturulamaz",
+                   "joint \u0027j1\u0027: sliding_fit icin clearance_mm kritik olcu eksik -\u003e BLOCKED"
+               ],
+    "warnings":  [
+                     "WARNING: (body) tolerans belirtilmedi",
+                     "WARNING: (pen) tolerans belirtilmedi",
+                     "WARNING: (phone) tolerans belirtilmedi",
+                     "WARNING: (cable) tolerans belirtilmedi"
+                 ],
+    "printer":  "generic-fdm"
+}

@@ -1,8 +1,9 @@
-# USER-GUIDE — 3D AI Designer V1 (basit dil)
+# USER-GUIDE — 3D AI Designer V1.1 (basit dil)
 
 ## Bu program ne yapiyor?
 Yazdigin olculerden 3 boyutlu yazdirilabilir model dosyasi (STL) hazirliyor.
 Sen olcu verirsin, program cizer, olcer, kontrol eder, klasore koyar.
+V1.1: kutu disinda silindir, boru, ici-bos kutu, kapak, kanal/kesik de yapabilir.
 
 ## Nasil kullanilir? (kolay yol)
 1. `app\DesignerV1.ps1` dosyasini PowerShell ile calistir.
@@ -11,12 +12,26 @@ Sen olcu verirsin, program cizer, olcer, kontrol eder, klasore koyar.
 4. Program anlamadigi bir olcu varsa sorar (ornek: delik merkezi). Cevabi yaz, DEVAM ET'e bas.
 5. Yesil tikler cikarsa model hazirdir: SCAD'I AC, STL'YI AC, PROJE KLASORU butonlarini kullan.
 
+## Neler yazabilirsin? (ornekler)
+- `80x40x20 kutu, delik 25 merkez 15,15`
+- `100x80x50 kutu, icini bosalt duvar 2.5, ustu acik`
+- `dis cap 30 ic cap 20 boy 40 boru`
+- `60x40x20 kutu, kapak yukseklik 5, 0.2 mm bosluk`
+- `onde 20x10 kanal` (konumunu da yaz: `konum 5,5 derinlik 8`)
+- Anlasilmayan kritik olcude program SORAR; "biraz gevsek" gibi ifadelere deger uydurmaz, sorar.
+
+## Ekrandaki yeni paneller
+- PARCALAR: cok parcali urunde her parca ve durumu
+- VALIDATION: her parcanin kontrol sonucu
+- UYARILAR: riskli ama engel olmayan durumlar (olcun degistirilmez)
+- SORU/CEVAP GECMISI: ne soruldu, ne cevapladin
+
 ## Projelerim nerede?
 `projects` klasorunde, her modelin kendi klasoru var. Icinde:
 - Ne istedigin (input.md)
-- Cizim (cad/model.scad)
-- Yazdirmalik dosya (output/model.stl)
-- Kontrol raporu (validation/validation.json)
+- Cizim (cad/<parca>.scad — cok parcalida parca basi dosya)
+- Yazdirmalik dosya (output/<parca>.stl)
+- Kontrol raporu (validation/<parca>.validation.json + project.json)
 - Aciklama (README.md)
 
 ## Dikkat edilecekler

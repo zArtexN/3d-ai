@@ -1,9 +1,13 @@
-# DEVELOPMENT — 3D AI Designer V1 (gelistirici)
+# DEVELOPMENT — 3D AI Designer V1.1 (gelistirici)
 
 ## Calistirma
-- Testler: `powershell -File scripts\Run-Tests.ps1` (7/7 sart)
+- Hepsi: `powershell -File scripts\Run-AllTests.ps1` (TOTAL 40/40 sart)
+- V1: `powershell -File scripts\Run-Tests.ps1` (7/7, DEGISTIRME)
+- Geometri: `powershell -File scripts\Run-GeometryTests.ps1` (TEST 8-20)
 - UI selftest (penceresiz): `powershell -File app\DesignerV1.ps1 -SelfTest`
-- Engine: `powershell -File engine\Invoke-DesignEngine.ps1 -Spec projects\<ad>\input.json`
+- V1 engine: `powershell -File engine\Invoke-DesignEngine.ps1 -Spec projects\<ad>\input.json`
+- V1.1 engine: `powershell -File engine\Invoke-GeometryEngine.ps1 -SpecFile projects\<ad>\spec.json`
+- Parser: `powershell -File engine\ConvertTo-GeometrySpec.ps1 -Prompt "..." -ProjectName x -OutPath ...`
 - Tum yollar root'a goreceli; `settings.json` null birakilirsa resolver calisir.
 
 ## Kod kurallari (aci tecrubelerden)
@@ -13,12 +17,20 @@
 4. Verify cagrilarinda HASHTABLE splat (`@{...}`); array splat pozisyonel baglar.
 5. `Verify/Design` throw eder (try/catch ile yakala); `Engine` exit kodu verir (`$LASTEXITCODE`).
 6. `@($null).Count` = 1'dir; bos-alan kontrolunde `Where-Object { $_ -ne $null }` sart.
-7. `Export-Stl.ps1` ve Faz 2/3 ciktilari DEGISTIRILMEZ; testler onlari sadece okur.
-8. Yeni script eklersen `Run-Tests.ps1`'e testini ekle; gecici dizinleri temizle.
+7. Cok elemanli array literalde aritmetik MUTLAKA parantezli: `@(($a - $b), ($c - $d))`.
+   Parantezsiz `@($a - $b, $c - $d)` bu ortamda op_Subtraction hatasi verir (V1.1 bulgusu).
+8. `[pscustomobject]@{...}` icine `List<T>` koyma; once `.ToArray()` cagir (V1.1 bulgusu).
+9. Dairesel yuzey ureten SCAD'a `$fn = 96` ekle; dusuk facet bbox'u kucultur, verify FAIL olur.
+10. `Export-Stl.ps1` ve Faz 2/3 ciktilari DEGISTIRILMEZ; testler onlari sadece okur.
+11. Yeni script eklersen test paketine testini ekle; gecici dizinleri retry-ile temizle.
 
-## Yeni geometri ekleme
-`engine/Invoke-DesignEngine.ps1` adim 2 (destek kontrolu) + adim 3 (SCAD uretici) genisletilir;
-`schemas/input.schema.json` guncellenir; `Test-DesignSpec.ps1`'e hata/uyari kurali eklenir.
+## Yeni geometry operation ekleme (V1.1)
+1. `engine/Geometry.ps1`: `New-G<Ad>` ctor (pozitiflik kontrolu + bbox takibi) + gerekiyorsa boolean/transform destegi.
+2. `schemas/designspec.schema.json`: yeni alanlar (missing/null ile; uydurma deger YASAK).
+3. `engine/ConvertTo-GeometrySpec.ps1`: TR kalip (belirsizse soru uret, deger uydurma).
+4. `engine/Test-GeometrySpec.ps1`: ERROR (BLOCKED) / WARNING kurallari (otomatik duzeltme YOK).
+5. `engine/Invoke-GeometryEngine.ps1`: uretim adimi + expected bbox (koseleri donustur).
+6. `scripts/Run-GeometryTests.ps1`: en az 1 PASS + 1 basarisizlik (BLOCKED/FAIL) testi.
 Desteklenmeyen geometri BLOCKED dondurur, sessizce atlanmaz.
 
 ## Siradaki faz (G-code)

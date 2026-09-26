@@ -120,8 +120,8 @@ $currentSpecPath = ""
 $pendingQuestions = @()
 
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "3D AI Designer V1 (prototip)"
-$form.Size = New-Object System.Drawing.Size(720, 640)
+$form.Text = "3D AI Designer V1.1 (prototip)"
+$form.Size = New-Object System.Drawing.Size(720, 800)
 $form.StartPosition = "CenterScreen"
 
 $lblTitle = New-Object System.Windows.Forms.Label
@@ -235,7 +235,84 @@ $txtDetail.Location = New-Object System.Drawing.Point(480, 447)
 $txtDetail.Size = New-Object System.Drawing.Size(200, 120)
 $form.Controls.Add($txtDetail)
 
+$lblParts = New-Object System.Windows.Forms.Label
+$lblParts.Text = "PARCALAR"
+$lblParts.Location = New-Object System.Drawing.Point(20, 572)
+$lblParts.Size = New-Object System.Drawing.Size(400, 20)
+$form.Controls.Add($lblParts)
+
+$lstParts = New-Object System.Windows.Forms.ListBox
+$lstParts.Location = New-Object System.Drawing.Point(20, 594)
+$lstParts.Size = New-Object System.Drawing.Size(450, 60)
+$form.Controls.Add($lstParts)
+
+$lblVal = New-Object System.Windows.Forms.Label
+$lblVal.Text = "VALIDATION"
+$lblVal.Location = New-Object System.Drawing.Point(480, 572)
+$lblVal.Size = New-Object System.Drawing.Size(200, 20)
+$form.Controls.Add($lblVal)
+
+$lstValidation = New-Object System.Windows.Forms.ListBox
+$lstValidation.Location = New-Object System.Drawing.Point(480, 594)
+$lstValidation.Size = New-Object System.Drawing.Size(200, 60)
+$form.Controls.Add($lstValidation)
+
+$lblHist = New-Object System.Windows.Forms.Label
+$lblHist.Text = "SORU/CEVAP GECMISI"
+$lblHist.Location = New-Object System.Drawing.Point(20, 659)
+$lblHist.Size = New-Object System.Drawing.Size(400, 20)
+$form.Controls.Add($lblHist)
+
+$txtHistory = New-Object System.Windows.Forms.TextBox
+$txtHistory.Multiline = $true
+$txtHistory.ReadOnly = $true
+$txtHistory.ScrollBars = "Vertical"
+$txtHistory.Location = New-Object System.Drawing.Point(20, 681)
+$txtHistory.Size = New-Object System.Drawing.Size(450, 60)
+$form.Controls.Add($txtHistory)
+
+$lblWarn = New-Object System.Windows.Forms.Label
+$lblWarn.Text = "UYARILAR"
+$lblWarn.Location = New-Object System.Drawing.Point(480, 659)
+$lblWarn.Size = New-Object System.Drawing.Size(200, 20)
+$form.Controls.Add($lblWarn)
+
+$lstWarnings = New-Object System.Windows.Forms.ListBox
+$lstWarnings.Location = New-Object System.Drawing.Point(480, 681)
+$lstWarnings.Size = New-Object System.Drawing.Size(200, 60)
+$form.Controls.Add($lstWarnings)
+
 $script:lastProjectDir = ""
+$script:history = New-Object System.Collections.Generic.List[string]
+
+function Add-History($t) {
+  $script:history.Add($t)
+  $txtHistory.Lines = $script:history.ToArray()
+}
+function Show-ProjectPanels($pd) {
+  $lstParts.Items.Clear(); $lstValidation.Items.Clear(); $lstWarnings.Items.Clear()
+  $pj = Join-Path $pd "project.json"
+  if (Test-Path -LiteralPath $pj) {
+    $p = Get-Content -LiteralPath $pj -Raw | ConvertFrom-Json
+    foreach ($part in @($p.parts)) { [void]$lstParts.Items.Add("$($part.id): $($part.status)") }
+    [void]$lstValidation.Items.Add("proje: $($p.validation_status)")
+  } else {
+    foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $pd "output") -Filter "*.stl" -ErrorAction SilentlyContinue)) {
+      [void]$lstParts.Items.Add($f.Name)
+    }
+  }
+  $vd = Join-Path $pd "validation"
+  if (Test-Path -LiteralPath $vd) {
+    foreach ($f in (Get-ChildItem -LiteralPath $vd -Filter "*.json")) {
+      try {
+        $v = Get-Content -LiteralPath $f.FullName -Raw | ConvertFrom-Json
+        [void]$lstValidation.Items.Add("$($f.BaseName): $($v.status)")
+        foreach ($w in @($v.warnings)) { [void]$lstWarnings.Items.Add([string]$w) }
+        foreach ($w in @($v.design_warnings)) { [void]$lstWarnings.Items.Add([string]$w) }
+      } catch { }
+    }
+  }
+}
 
 function Refresh-Projects {
   $lstProjects.Items.Clear()
@@ -248,6 +325,7 @@ function Run-Engine {
     $o = & $engineScript -Spec $currentSpecPath -ProjectDir (Join-Path $projectsDir $currentSpec.project_name) 2>&1 | Out-String
     $code = $LASTEXITCODE
     $script:lastProjectDir = Join-Path $projectsDir $currentSpec.project_name
+    Show-ProjectPanels $script:lastProjectDir
     $lstResult.Items.Clear()
     if ($code -eq 0) {
       $lstResult.Items.Add("SCAD olusturuldu")
@@ -269,6 +347,7 @@ function Run-Engine {
 
 $btnCreate.Add_Click({
   $lstResult.Items.Clear()
+  $lstParts.Items.Clear(); $lstValidation.Items.Clear(); $lstWarnings.Items.Clear()
   $btnScad.Enabled = $false; $btnStl.Enabled = $false; $btnFolder.Enabled = $false
   $name = ("proje-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
   $script:currentSpec = Convert-PromptToSpec $txtPrompt.Text $name
@@ -278,6 +357,7 @@ $btnCreate.Add_Click({
   Set-Status "analiz ediliyor..."
   if ($script:pendingQuestions.Count -gt 0) {
     $txtQuestion.Text = $script:pendingQuestions[0]
+    Add-History ("SORU: " + $script:pendingQuestions[0])
     $txtAnswer.Enabled = $true; $btnContinue.Enabled = $true
     Set-Status "soru soruldu - cevabi yazip DEVAM ET"
   } else {
@@ -290,6 +370,7 @@ $btnContinue.Add_Click({
   # V1: "merkez 15,15" kalibini cevaptan okur; okunamazsa durur (uydurmaz).
   $m = [regex]::Match($txtAnswer.Text, '(\d+(?:[.,]\d+)?)\s*[,;]\s*(\d+(?:[.,]\d+)?)')
   if (-not $m.Success) { Set-Status "cevap anlasilmadi (ornek: merkez 15,15)"; return }
+  Add-History ("CEVAP: " + $txtAnswer.Text)
   foreach ($h in @($script:currentSpec.holes)) {
     if ($h -and ($h.status -eq "missing" -or $null -eq $h.center_x_mm)) {
       $h.center_x_mm = [double]($m.Groups[1].Value -replace ',', '.')
@@ -324,6 +405,7 @@ $lstProjects.Add_SelectedIndexChanged({
   if (Test-Path -LiteralPath $vp) { $lines.Add("Validation: " + (Get-Content -LiteralPath $vp -Raw | ConvertFrom-Json).status) }
   $rp = Join-Path $pd "README.md"; if (Test-Path -LiteralPath $rp) { $lines.Add("README: var") } else { $lines.Add("README: yok") }
   $txtDetail.Lines = $lines.ToArray()
+  Show-ProjectPanels $pd
 })
 
 Refresh-Projects

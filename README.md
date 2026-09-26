@@ -1,7 +1,8 @@
-# 3D AI Designer V1 — 3D Printing AI Automation
+# 3D AI Designer V1.1 — 3D Printing AI Automation
 
 Dogal dil -> olculere sadik parametrik model -> STL/3MF -> dogrulama -> README.
 Slicing ayri asama; G-code SADECE OrcaSlicer profilleriyle (su an kapali).
+V1.1: geometry engine (box/cylinder/tube/hollow/kapak/kanal/cok-parca), TR parser, tolerans sistemi.
 
 ## Hizli kullanim
 
@@ -16,14 +17,18 @@ Masaustu prototip ile:
 3. G-code butonu bilerek YOK.
 
 Otomatik testler:
-- `powershell -File scripts\Run-Tests.ps1` (7 test, hepsi gecmeli)
+- `powershell -File scripts\Run-AllTests.ps1` (hepsi: TOTAL 40/40 sart)
+- `powershell -File scripts\Run-Tests.ps1` (V1: 7 test, DEGISTIRME)
+- `powershell -File scripts\Run-GeometryTests.ps1` (V1.1: TEST 8-20)
 
 ## Klasorler
 - `.opencode/skills/3d-printing/` — zorunlu is akisi (Faz 3 kurallari)
 - `.opencode/agents/` — `@3d-print-engineer` subagent
-- `engine/` — Design Engine: `Invoke-DesignEngine.ps1` (orkestrasyon, max 3 tur retry), `Test-DesignSpec.ps1` (tasarim dogrulama; hata/uyari, asla otomatik degistirmez)
-- `app/` — DesignerV1 WinForms prototipi (motoru cagirir, kopyalamaz)
-- `schemas/` — `input.schema.json` (normalize tasarim verisi), `printer.schema.json`, `material.schema.json` (gelecek)
+- `engine/` — V1: `Invoke-DesignEngine.ps1` + `Test-DesignSpec.ps1` (kutu+delik, korunur).
+  V1.1: `Geometry.ps1` (geometri kutuphanesi), `Invoke-GeometryEngine.ps1` (cok-parca),
+  `Test-GeometrySpec.ps1` (v2 dogrulama), `ConvertTo-GeometrySpec.ps1` (TR parser)
+- `app/` — DesignerV1 WinForms prototipi (motoru cagirir, kopyalamaz; parca/validation/uyari/gecmis panelli)
+- `schemas/` — `input.schema.json` (V1), `designspec.schema.json` (v2), `printer|material.schema.json` (gelecek)
 - `printers/` — yazici limitleri + Orca profil adlari. `generic-fdm.json` PLACEHOLDER'dir; gercek profil eklenmeden slicing yapilmaz
 - `materials/` — kural dosyasi (profil ekleme ileride; deger uydurma yok)
 - `scripts/` — `Resolve-*.ps1` (exe bulucular), `Export-Stl.ps1` (modelleme), `Verify-Stl.ps1` (STL dogrulama PASS/WARNING/FAIL), `Slice.ps1` (placeholder, calismaz), `Run-Tests.ps1`
