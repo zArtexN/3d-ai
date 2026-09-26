@@ -8,6 +8,7 @@
   TEST 4: bilerek yanlis delik capi -> VERIFY FAIL bekleniyor
   TEST 5: eksik kritik olcu (delik merkezi missing) -> ENGINE BLOCKED, MODEL URETILMEMELI
   TEST 6: ince duvar (0.6mm) -> DESIGN WARNING (FAIL degil, deger korunur)
+  TEST 7: engine uctan uca (gecici proje) -> ENGINE PASS + validation.json
   Her test sonucu yazilir; basarisiz testin nedeni acikca belirtilir. Cikis: 0 = hepsi gecti.
   NOT: Verify/Design throw ile hata verir (exit degil); Engine exit kodu verir.
   Bu yuzden T1-T4 throw yakalar, T5-T6 exit kodu okur.
@@ -107,6 +108,32 @@ try {
   Add-Result "TEST 6 (ince duvar -> WARNING)" $ok $(if ($ok) { "uyari uretildi, FAIL yok, deger korunur" } else { "exit=$desCode" })
 } catch { Add-Result "TEST 6 (ince duvar -> WARNING)" $false $_.Exception.Message }
 finally { if (Test-Path -LiteralPath $tmpSpec6) { Remove-Item -LiteralPath $tmpSpec6 -Force } }
+
+# TEST 7 (engine uctan uca PASS + validation.json; gecici dizin temizlenir)
+$tmpDir7 = Join-Path $Root (Join-Path "projects" "_test7-tmp")
+try {
+  if (Test-Path -LiteralPath $tmpDir7) { Remove-Item -LiteralPath $tmpDir7 -Recurse -Force }
+  New-Item -ItemType Directory -Force -Path $tmpDir7 | Out-Null
+  $spec7 = [pscustomobject]@{
+    project_name = "_test7-tmp"
+    prompt = "TEST 7: engine uctan uca"
+    body = [pscustomobject]@{ width_mm = 30; depth_mm = 20; height_mm = 10 }
+    wall_thickness_mm = 2
+    holes = @([pscustomobject]@{ id = "h1"; diameter_mm = 6; center_x_mm = 10; center_y_mm = 10; through = $true; status = "ok" })
+    tolerance_mm = $null; material = $null
+  }
+  $spec7Path = Join-Path $tmpDir7 "input.json"
+  $spec7 | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $spec7Path -Encoding UTF8
+  $o = & $Engine -Spec $spec7Path -ProjectDir $tmpDir7 2>&1 | Out-String
+  $engCode7 = $LASTEXITCODE
+  $val7 = Join-Path $tmpDir7 (Join-Path "validation" "validation.json")
+  $stl7ok = Test-Path -LiteralPath (Join-Path $tmpDir7 (Join-Path "output" "model.stl"))
+  $pass7 = $false
+  if (Test-Path -LiteralPath $val7) { $pass7 = ((Get-Content -LiteralPath $val7 -Raw | ConvertFrom-Json).status -eq "PASS") }
+  $ok = (($engCode7 -eq 0) -and $stl7ok -and $pass7)
+  Add-Result "TEST 7 (engine uctan uca PASS)" $ok $(if ($ok) { "SCAD+STL+validation.json uretildi" } else { "exit=$engCode7 stl=$stl7ok pass=$pass7" })
+} catch { Add-Result "TEST 7 (engine uctan uca PASS)" $false $_.Exception.Message }
+finally { if (Test-Path -LiteralPath $tmpDir7) { Remove-Item -LiteralPath $tmpDir7 -Recurse -Force } }
 
 $passed = @($results | Where-Object { $_.result -eq "PASS" }).Count
 Write-Output "----------------------------------------"

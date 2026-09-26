@@ -1,0 +1,27 @@
+﻿{
+    "status":  "PASS",
+    "bbox":  {
+                 "x":  80,
+                 "y":  40,
+                 "z":  20
+             },
+    "facet_info":  [
+                       "bbox: X [0, 80]  Y [0, 40]  Z [0, 20]",
+                       "facet: 400",
+                       "delik rim: alt=484 ust=484 (merkez 15,15 cap 25)"
+                   ],
+    "last_output_head":  "format: ascii (64965 bayt) | bbox: X [0, 80]  Y [0, 40]  Z [0, 20] | facet: 400",
+    "file_bytes":  64965,
+    "hole_checks":  [
+                        {
+                            "id":  "h1",
+                            "result":  "PASS",
+                            "detail":  "format: ascii (64965 bayt)\r\nbbox: X [0, 80]  Y [0, 40]  Z [0, 20]\r\nfacet: 400\r\ndelik rim: alt=484 ust=484 (merkez 15,15 cap 25)\r\nVERIFY: PASS"
+                        }
+                    ],
+    "design_warnings":  [
+                            "WARNING: tolerans belirtilmedi (tolerance_mm null); gecme payi gerekiyorsa sorulmali"
+                        ],
+    "retries":  0,
+    "printer":  "generic-fdm"
+}

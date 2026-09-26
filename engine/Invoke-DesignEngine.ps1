@@ -36,7 +36,11 @@ function Write-ValidationJson($dir, $obj) {
   New-Item -ItemType Directory -Force -Path $vdir | Out-Null
   $obj | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $vdir "validation.json") -Encoding UTF8
 }
-function Run-Verify([string[]]$VArgs) {
+function Write-Utf8NoBom($path, [string[]]$lines) {
+  # OpenSCAD 2021.01 BOM gorunce "syntax error line 1" verir; SCAD her zaman BOM-suz yazilir.
+  [System.IO.File]::WriteAllLines($path, $lines, (New-Object System.Text.UTF8Encoding $false))
+}
+function Run-Verify([hashtable]$VArgs) {
   try {
     $o = & $verifyScript @VArgs 2>&1 | Out-String
     return @{ code = 0; text = $o }
@@ -79,9 +83,9 @@ if ($dvCode -ne 0) {
 # 2. Geometri destegi: kutu + tam gecisli delikler
 $unsupported = New-Object System.Collections.Generic.List[string]
 foreach ($h in @($specObj.holes)) { if ($h -and -not $h.through) { $unsupported.Add("delik '" + $h.id + "' tam gecisli degil (desteklenmiyor)") } }
-if (@($specObj.cuts).Count -gt 0) { $unsupported.Add("cuts desteklenmiyor") }
+if (@($specObj.cuts | Where-Object { $_ -ne $null }).Count -gt 0) { $unsupported.Add("cuts desteklenmiyor") }
 if ($null -ne $specObj.walls) { $unsupported.Add("walls (ici bos govde) desteklenmiyor") }
-if (@($specObj.assemblies).Count -gt 0) { $unsupported.Add("assemblies desteklenmiyor") }
+if (@($specObj.assemblies | Where-Object { $_ -ne $null }).Count -gt 0) { $unsupported.Add("assemblies desteklenmiyor") }
 if ($unsupported.Count -gt 0) {
   New-Item -ItemType Directory -Force -Path $ProjectDir | Out-Null
   Write-ValidationJson $ProjectDir ([pscustomobject]@{
@@ -123,10 +127,13 @@ foreach ($h in $holes) {
 }
 $scad.Add("}")
 $scadPath = Join-Path $cadDir "model.scad"
-$scad | Set-Content -LiteralPath $scadPath -Encoding UTF8
+Write-Utf8NoBom $scadPath $scad.ToArray()
 
 if ($null -ne $specObj.prompt) { $specObj.prompt | Set-Content -LiteralPath (Join-Path $ProjectDir "input.md") -Encoding UTF8 }
-Copy-Item -LiteralPath $Spec -Destination (Join-Path $ProjectDir "input.json") -Force
+$destJson = Join-Path $ProjectDir "input.json"
+if ([System.IO.Path]::GetFullPath($Spec) -ne [System.IO.Path]::GetFullPath($destJson)) {
+  Copy-Item -LiteralPath $Spec -Destination $destJson -Force
+}
 
 # 4. OpenSCAD coz + export
 $openScad = $null
@@ -150,14 +157,18 @@ do {
   $stl = Join-Path $outDir "model.stl"
   $holeResults = @()
   $worst = "PASS"
-  $baseArgs = @("-Stl", $stl, "-ExpMinX", 0, "-ExpMinY", 0, "-ExpMinZ", 0, "-ExpMaxX", $w, "-ExpMaxY", $d, "-ExpMaxZ", $hgt)
+  $baseArgs = @{ Stl = $stl; ExpMinX = 0; ExpMinY = 0; ExpMinZ = 0; ExpMaxX = $w; ExpMaxY = $d; ExpMaxZ = $hgt }
   if ($holes.Count -eq 0) {
     $res = Run-Verify $baseArgs
     $lastVerify = $res.text
     if ($res.code -ne 0) { $worst = "FAIL" } elseif ($lastVerify -match "WARNING") { $worst = "WARNING" }
   } else {
     foreach ($h in $holes) {
-      $hargs = $baseArgs + @("-CheckHole", "-HoleCX", ([double]$h.center_x_mm), "-HoleCY", ([double]$h.center_y_mm), "-HoleDiameter", ([double]$h.diameter_mm))
+      $hargs = $baseArgs.Clone()
+      $hargs.CheckHole = $true
+      $hargs.HoleCX = [double]$h.center_x_mm
+      $hargs.HoleCY = [double]$h.center_y_mm
+      $hargs.HoleDiameter = [double]$h.diameter_mm
       $res = Run-Verify $hargs
       $txt = $res.text
       $r = "PASS"; if ($res.code -ne 0) { $r = "FAIL" } elseif ($txt -match "WARNING") { $r = "WARNING" }
@@ -176,6 +187,7 @@ $valObj = [pscustomobject]@{
   status = $finalStatus
   bbox = [pscustomobject]@{ x = $w; y = $d; z = $hgt }
   facet_info = @($lastVerify -split '\r\n|\r|\n' | Where-Object { $_ -match "facet|rim|bbox" })
+  last_output_head = ($lastVerify -split '\r\n|\r|\n' | Select-Object -First 3) -join " | "
   file_bytes = $(if ($stlInfo) { $stlInfo.Length } else { 0 })
   hole_checks = @($holeResults)
   design_warnings = @($dv.warnings)

@@ -1,0 +1,24 @@
+{
+  "project_name": "demo-kutu",
+  "prompt": "80x40x20 mm kutu govde, duvar 2 mm, ustte tam gecisli 25 mm delik, merkez kenarlardan 15 mm iceride.",
+  "body": {
+    "width_mm": 80,
+    "depth_mm": 40,
+    "height_mm": 20
+  },
+  "wall_thickness_mm": 2,
+  "holes": [
+    {
+      "id": "h1",
+      "diameter_mm": 25,
+      "center_x_mm": 15,
+      "center_y_mm": 15,
+      "through": true,
+      "status": "ok"
+    }
+  ],
+  "tolerance_mm": null,
+  "material": null,
+  "orientation": null,
+  "special_requirements": []
+}
