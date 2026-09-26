@@ -96,7 +96,7 @@ else {
   $hm2 = [regex]::Match($low, 'delikleri?\s*(\d+(?:[.,]\d+)?)')
   if ($hm2.Success) { $diaVal = (Get-Num $hm2.Groups[1].Value) }
   else {
-    $hm3 = [regex]::Match($low, '(\d+(?:[.,]\d+)?)\s*mm\s*[c\u00e7]ap[i\u0131]nda\s*delik')
+    $hm3 = [regex]::Match($low, '(\d+(?:[.,]\d+)?)\s*mm\s*[c\u00e7]ap[i\u0131]nda\s*(\w+\s+){0,3}delik')
     if ($hm3.Success) { $diaVal = (Get-Num $hm3.Groups[1].Value) }
   }
 }
@@ -137,6 +137,26 @@ if ($null -ne $diaVal) {
   $sm = [regex]::Match($low, '\b(m\d+)\b')
   if ($sm.Success) { $hole.screw = $sm.Groups[1].Value.ToUpperInvariant() }
   $comp.holes = @($hole)
+  $holeN = $null
+  $hmN = [regex]::Match($low, '(\d+)\s*delik')
+  if ($hmN.Success) { $holeN = [int]$hmN.Groups[1].Value }
+  elseif ($low -match "iki\s*delik") { $holeN = 2 }
+  elseif ($low -match "[u\u00fc][c\u00e7]\s*delik") { $holeN = 3 }
+  if ($null -ne $holeN -and $holeN -gt 1 -and $holeN -le 8) {
+    $extra = New-Object System.Collections.Generic.List[object]
+    $extra.Add($hole) | Out-Null
+    for ($hi = 2; $hi -le $holeN; $hi++) {
+      $clone = [pscustomobject]@{
+        id = ("h" + $hi); hole_type = $hole.hole_type; diameter_mm = $hole.diameter_mm
+        center_x_mm = $null; center_y_mm = $null; axis = "z"
+        depth_mm = $hole.depth_mm; cs_dia_mm = $hole.cs_dia_mm; cs_depth_mm = $hole.cs_depth_mm
+        cb_dia_mm = $hole.cb_dia_mm; cb_depth_mm = $hole.cb_depth_mm
+        screw = $null; status = "missing"
+      }
+      $extra.Add($clone) | Out-Null
+    }
+    $comp.holes = $extra.ToArray()
+  }
 }
 
 if ($low -match "slot" -or $low -match "kanal" -or $low -match "kesik" -or $low -match "a[c\u00e7][i\u0131]kl[i\u0131]k") {
@@ -188,6 +208,25 @@ if ($tm3.Success) {
 
 $components.Add($comp)
 $assembly = $null
+
+$divN = $null
+$dmNum = [regex]::Match($low, '(\d+)\s*b[o\u00f6]lme')
+if ($dmNum.Success) { $divN = [int]$dmNum.Groups[1].Value }
+elseif ($low -match "iki\s*b[o\u00f6]lme") { $divN = 2 }
+elseif ($low -match "[u\u00fc][c\u00e7]\s*b[o\u00f6]lme") { $divN = 3 }
+elseif ($low -match "d[o\u00f6]rt\s*b[o\u00f6]lme") { $divN = 4 }
+elseif ($low -match "b[o\u00f6]lme") { $divN = 1 }
+if ($null -ne $divN) {
+  for ($di = 1; $di -le $divN; $di++) {
+    $dv = [pscustomobject]@{
+      id = ("div" + $di); label = ("bolme " + $di)
+      base = [pscustomobject]@{ shape = "box"; width_mm = $null; depth_mm = $null; height_mm = $null }
+      hollow = $null; holes = @(); cutouts = @(); edge_notes = @(); transforms = @()
+      tolerance = $null; expected_bbox = $null
+    }
+    $components.Add($dv)
+  }
+}
 if ($low -match "kapak" -or $low -match "iki par[c\u00e7]a" -or ($low -match "taban" -and $low -match "destek")) {
   $lid = [pscustomobject]@{
     id = "lid"; label = "kapak"
@@ -202,6 +241,10 @@ if ($low -match "kapak" -or $low -match "iki par[c\u00e7]a" -or ($low -match "ta
   if ($null -eq $lc -and $null -ne $lh) { $questions.Add("Kapak-govde gecme boslugu nedir? (ornek: 0.2 mm bosluk). Kritik tolerans uydurulamaz.") }
   else { $lid.tolerance = [pscustomobject]@{ type = "clearance_fit"; clearance_mm = $lc; fit_to = "body"; status = "ok" } }
   $components.Add($lid)
+  if ($low -match "kapakta" -or $low -match "kapaktaki" -or $low -match "kapak\s+delik") {
+    $lid.holes = @($comp.holes)
+    $comp.holes = @()
+  }
   $assembly = [pscustomobject]@{
     parts = @("body", "lid")
     joints = @([pscustomobject]@{ id = "j1"; type = "sliding_fit"; part_a = "body"; part_b = "lid"; clearance_mm = $lc; screw = $null })

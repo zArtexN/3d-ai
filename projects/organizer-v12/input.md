@@ -1,0 +1,1 @@
+﻿120x80x40 mm ölçülerinde masaüstü organizer yap. Duvar kalınlığı 2 mm olsun. İçinde iki bölme olsun. Kapak ayrı parça olsun. Kapak ile gövde arasında 0.2 mm boşluk bırak. Kapakta 5 mm çapında iki delik olsun ve delikler yan kenarlardan 15 mm içeride bulunsun.

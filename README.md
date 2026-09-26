@@ -1,8 +1,16 @@
-# 3D AI Designer V1.1 — 3D Printing AI Automation
+# 3D AI Designer V1.2 — 3D Printing AI Automation
 
 Dogal dil -> olculere sadik parametrik model -> STL/3MF -> dogrulama -> README.
 Slicing ayri asama; G-code SADECE OrcaSlicer profilleriyle (su an kapali).
-V1.1: geometry engine (box/cylinder/tube/hollow/kapak/kanal/cok-parca), TR parser, tolerans sistemi.
+V1.2: uretim hatti (prompt -> soru/cevap -> spec v2 -> geometry engine -> STL -> validation).
+
+## Uretim hatti (V1.2)
+
+USER -> PROMPT -> PARSER/AI (yalnizca DesignSpec v2) -> QUESTION LOOP ->
+VALIDATION -> GEOMETRY ENGINE -> OPENSCAD -> STL -> STL VALIDATION ->
+PROJECT RESULT -> [REAL PRINTER PROFILE REQUIRED] -> ORCASLICER -> G-CODE
+
+G-code asamasi AKTIF DEGIL: printer profili gerekli. "Print Ready" ifadesi kullanilmaz.
 
 ## Hizli kullanim
 
@@ -17,9 +25,11 @@ Masaustu prototip ile:
 3. G-code butonu bilerek YOK.
 
 Otomatik testler:
-- `powershell -File scripts\Run-AllTests.ps1` (hepsi: TOTAL 40/40 sart)
+- `powershell -File scripts\Run-AllTests.ps1` (hepsi: syntax+V1+geometry+pipeline+parser+UI+resolver)
 - `powershell -File scripts\Run-Tests.ps1` (V1: 7 test, DEGISTIRME)
 - `powershell -File scripts\Run-GeometryTests.ps1` (V1.1: TEST 8-20)
+- `powershell -File scripts\Run-PipelineTests.ps1` (V1.2: T21-T44 + TA/B/C)
+- `powershell -File scripts\Run-ParserTests.ps1` (V1.2: P1-P16)
 
 ## Klasorler
 - `.opencode/skills/3d-printing/` — zorunlu is akisi (Faz 3 kurallari)

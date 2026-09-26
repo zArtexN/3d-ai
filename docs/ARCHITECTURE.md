@@ -1,4 +1,19 @@
-# ARCHITECTURE — 3D AI Designer V1.1 (teknik)
+# ARCHITECTURE — 3D AI Designer V1.2 (teknik)
+
+## Uretim hatti (V1.2, §27)
+
+```text
+USER -> PROMPT -> PARSER/AI (yalnizca DesignSpec v2)
+  -> QUESTION LOOP (kritik eksik -> soru -> cevap -> spec guncelle)
+  -> VALIDATION (gate: schema + required + numeric + missing + impossible + tolerance)
+  -> GEOMETRY ENGINE -> OPENSCAD -> STL -> STL VALIDATION
+  -> PROJECT RESULT (project.json + README)
+  -> [REAL PRINTER PROFILE REQUIRED] -> ORCASLICER -> G-CODE (kapali)
+```
+
+AI katmani (`engine/AIProvider.ps1`): arayuz `GenerateDesignSpec(prompt, context)` ->
+DesignSpec v2. Su an yalnizca MOCK (parser) bagli; OPENAI/CLAUDE/LOCAL/OLLAMA
+arayuze uygun eklenir. AI ciktisi guvenilmez kabul edilir, gate'ten gecer.
 
 ## Akis (§23)
 

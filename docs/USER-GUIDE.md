@@ -20,7 +20,16 @@ V1.1: kutu disinda silindir, boru, ici-bos kutu, kapak, kanal/kesik de yapabilir
 - `onde 20x10 kanal` (konumunu da yaz: `konum 5,5 derinlik 8`)
 - Anlasilmayan kritik olcude program SORAR; "biraz gevsek" gibi ifadelere deger uydurmaz, sorar.
 
-## Ekrandaki yeni paneller
+## Soru sorarsa ne yapmalisin?
+Program eksik kritik olcuyu UYDURMAZ, sorar. Ornek: delik merkezi, duvar yonü
+(acik/kapali), kapak boslugu. Cevabi yaz, DEVAM ET'e bas. Tum soru/cevaplar
+SORU/CEVAP GECMISI panelinde saklanir.
+
+## Sonuc ekrani nasil okunur?
+- PROJECT: proje adi · DESIGN: parca sayisi · CAD/STL: PASS (dosya uretildi)
+- VALIDATION: PASS / WARNING / BLOCKED (kategori detaylari listede)
+- PARTS: her parca ve durumu
+- G-CODE: NOT AVAILABLE yazar. "Print Ready" yazmaz; yazici profili gerekir.
 - PARCALAR: cok parcali urunde her parca ve durumu
 - VALIDATION: her parcanin kontrol sonucu
 - UYARILAR: riskli ama engel olmayan durumlar (olcun degistirilmez)

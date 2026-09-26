@@ -1,0 +1,26 @@
+﻿{
+    "status":  "PASS",
+    "part":  "div2",
+    "categories":  {
+                       "geometry":  "PASS",
+                       "feature":  "PASS",
+                       "assembly":  "PASS",
+                       "manufacturability":  "WARNING"
+                   },
+    "bbox_min":  [
+                     0,
+                     0,
+                     0
+                 ],
+    "bbox_max":  [
+                     30,
+                     70,
+                     30
+                 ],
+    "file_bytes":  1589,
+    "hole_checks":  [
+
+                    ],
+    "retries":  0,
+    "detail_head":  "format: ascii (1589 bayt) | bbox: X [0, 30]  Y [0, 70]  Z [0, 30] | facet: 12"
+}

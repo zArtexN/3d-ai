@@ -42,7 +42,12 @@ function Parse-One($t) {
 
 $qfile = [System.IO.Path]::ChangeExtension($SpecFile, ".questions.json")
 $qs = @()
-if (Test-Path -LiteralPath $qfile) { $qs = @(Get-Content -LiteralPath $qfile -Raw | ConvertFrom-Json) }
+if (Test-Path -LiteralPath $qfile) {
+  $qsRawFile = Get-Content -LiteralPath $qfile -Raw | ConvertFrom-Json
+  if ($null -eq $qsRawFile) { $qs = @() }
+  elseif ($qsRawFile -is [array]) { $qs = $qsRawFile }
+  else { $qs = @($qsRawFile) }
+}
 $q = $qs | Where-Object { $_.question_id -eq $QuestionId } | Select-Object -First 1
 if ($null -eq $q) { throw "Soru bulunamadi: $QuestionId" }
 $kind = [string]$q.kind

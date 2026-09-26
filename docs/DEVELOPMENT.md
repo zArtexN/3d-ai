@@ -19,10 +19,13 @@
 6. `@($null).Count` = 1'dir; bos-alan kontrolunde `Where-Object { $_ -ne $null }` sart.
 7. Cok elemanli array literalde aritmetik MUTLAKA parantezli: `@(($a - $b), ($c - $d))`.
    Parantezsiz `@($a - $b, $c - $d)` bu ortamda op_Subtraction hatasi verir (V1.1 bulgusu).
-8. `[pscustomobject]@{...}` icine `List<T>` koyma; once `.ToArray()` cagir (V1.1 bulgusu).
-9. Dairesel yuzey ureten SCAD'a `$fn = 96` ekle; dusuk facet bbox'u kucultur, verify FAIL olur.
-10. `Export-Stl.ps1` ve Faz 2/3 ciktilari DEGISTIRILMEZ; testler onlari sadece okur.
-11. Yeni script eklersen test paketine testini ekle; gecici dizinleri retry-ile temizle.
+8. `X | Out-String | ConvertFrom-Json` TEK zincirde KULLANMA (buyuk ciktilar kirpilir).
+   Ara degiskene bol: `$t = X | Out-String` sonra `$o = $t | ConvertFrom-Json` (V1.2 bulgusu).
+9. Karmasik tek-satir bool ifadelerini ara degiskenlere bol (V1.2 bulgusu).
+10. `[pscustomobject]@{...}` icine `List<T>` koyma; once `.ToArray()` cagir (V1.1 bulgusu).
+11. Dairesel yuzey ureten SCAD'a `$fn = 96` ekle; dusuk facet bbox'u kucultur, verify FAIL olur.
+12. `Export-Stl.ps1` ve Faz 2/3 ciktilari DEGISTIRILMEZ; testler onlari sadece okur.
+13. Yeni script eklersen test paketine testini ekle; gecici dizinleri retry-ile temizle.
 
 ## Yeni geometry operation ekleme (V1.1)
 1. `engine/Geometry.ps1`: `New-G<Ad>` ctor (pozitiflik kontrolu + bbox takibi) + gerekiyorsa boolean/transform destegi.

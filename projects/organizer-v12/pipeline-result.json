@@ -1,0 +1,29 @@
+﻿{
+    "status":  "PASS",
+    "stage":  "done",
+    "provider":  "MOCK",
+    "reason":  "proje tamamlandi",
+    "questions":  [
+
+                  ],
+    "parts":  [
+                  {
+                      "id":  "body.validation",
+                      "status":  "PASS"
+                  },
+                  {
+                      "id":  "div1.validation",
+                      "status":  "PASS"
+                  },
+                  {
+                      "id":  "div2.validation",
+                      "status":  "PASS"
+                  },
+                  {
+                      "id":  "lid.validation",
+                      "status":  "PASS"
+                  }
+              ],
+    "gcode_available":  false,
+    "gcode_note":  "NOT AVAILABLE - printer profile required"
+}

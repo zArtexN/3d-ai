@@ -136,7 +136,8 @@ if (Test-Path -LiteralPath $vd) {
   foreach ($f in (Get-ChildItem -LiteralPath $vd -Filter "*.validation.json")) {
     try {
       $v = Get-Content -LiteralPath $f.FullName -Raw | ConvertFrom-Json
-      $parts.Add([pscustomobject]@{ id = ($f.BaseName); status = [string]$v.status })
+      $pid = ([string]$f.BaseName -replace '\.validation$', '')
+      $parts.Add([pscustomobject]@{ id = $pid; status = [string]$v.status })
       if ($v.status -eq "BLOCKED" -or $v.status -eq "FAILED_AFTER_RETRIES" -or $v.status -eq "FAIL") { $worst = "FAILED" }
       elseif ($v.status -eq "WARNING" -and $worst -eq "PASS") { $worst = "WARNING" }
       Write-PLog $ProjectDir "validation.log" ($f.BaseName + " " + [string]$v.status)

@@ -1,0 +1,74 @@
+﻿[
+    {
+        "question_id":  "q1",
+        "component":  "body",
+        "field":  "hollow.open_top",
+        "target":  "body.hollow_top",
+        "kind":  "hollow_top",
+        "question":  "\u0027body\u0027 ustu acik mi kapali mi? Cevap: acik / kapali.",
+        "reason":  "ic bosluk yonune karar verilmeden geometri kurulamaz",
+        "answer":  "acik",
+        "source":  "user",
+        "asked_at":  "2026-09-26T19:54:58.0730379Z"
+    },
+    {
+        "question_id":  "q2",
+        "component":  "div1",
+        "field":  "base.dims",
+        "target":  "div1.dims",
+        "kind":  "dims",
+        "question":  "\u0027div1\u0027 parcasi olculeri eksik. Ornek: 80x40x20 (mm).",
+        "reason":  "dis olcu olmadan govde uretilemez",
+        "answer":  "50x70x30",
+        "source":  "user",
+        "asked_at":  "2026-09-26T19:54:58.0911263Z"
+    },
+    {
+        "question_id":  "q3",
+        "component":  "div2",
+        "field":  "base.dims",
+        "target":  "div2.dims",
+        "kind":  "dims",
+        "question":  "\u0027div2\u0027 parcasi olculeri eksik. Ornek: 80x40x20 (mm).",
+        "reason":  "dis olcu olmadan govde uretilemez",
+        "answer":  "30x70x30",
+        "source":  "user",
+        "asked_at":  "2026-09-26T19:54:58.1072550Z"
+    },
+    {
+        "question_id":  "q4",
+        "component":  "lid",
+        "field":  "base.dims",
+        "target":  "lid.dims",
+        "kind":  "lid_height",
+        "question":  "\u0027lid\u0027 parcasi olculeri eksik. Ornek: 80x40x20 (mm).",
+        "reason":  "dis olcu olmadan govde uretilemez",
+        "answer":  "5",
+        "source":  "user",
+        "asked_at":  "2026-09-26T19:54:58.1264444Z"
+    },
+    {
+        "question_id":  "q5",
+        "component":  "lid",
+        "field":  "holes.h1.center",
+        "target":  "lid.hole.h1.center",
+        "kind":  "hole_center",
+        "question":  "Delik \u0027h1\u0027 merkezi nerede? Ornek: merkez 15,15 (referans koseden mm).",
+        "reason":  "konum kritik; uydurulamaz",
+        "answer":  "15,20",
+        "source":  "user",
+        "asked_at":  "2026-09-26T19:54:58.1480991Z"
+    },
+    {
+        "question_id":  "q6",
+        "component":  "lid",
+        "field":  "holes.h2.center",
+        "target":  "lid.hole.h2.center",
+        "kind":  "hole_center",
+        "question":  "Delik \u0027h2\u0027 merkezi nerede? Ornek: merkez 15,15 (referans koseden mm).",
+        "reason":  "konum kritik; uydurulamaz",
+        "answer":  "105,20",
+        "source":  "user",
+        "asked_at":  "2026-09-26T19:54:58.1643404Z"
+    }
+]
