@@ -1,0 +1,1 @@
+50 × 50 × 10 mm dikdörtgen prizma, bir köşesinde 10 mm çapında tam delik. Tüm ölçüler milimetre. Parametrik OpenSCAD modeli. Sadece zincir testi: Prompt → OpenSCAD → SCAD → STL. Henüz OrcaSlicer ile G-code oluşturma.

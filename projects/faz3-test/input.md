@@ -1,0 +1,1 @@
+Ana govde: 80 x 40 x 20 mm. Duvar kalinligi: 2 mm. Ust yuzeyde tam gecisli 25 mm capinda delik. Delik merkezi kullanicinin ayrica belirtecegi bir deger olarak ele alinmali. Model parametrik olacak. Tum olculer milimetre.

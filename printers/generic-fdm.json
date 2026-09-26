@@ -1,0 +1,18 @@
+{
+  "$schema": "../printers/_schema.not-yet.json",
+  "id": "generic-fdm",
+  "label": "Generic FDM (placeholder — gercek yazicini ekleyene kadar kullanma)",
+  "nozzle_mm": 0.4,
+  "bed_mm": [220, 220, 250],
+  "min_wall_mm": 1.2,
+  "min_feature_mm": 0.8,
+  "min_hole_mm": 2.0,
+  "max_overhang_deg": 45,
+  "default_clearance_mm": null,
+  "orca_profiles": {
+    "printer": "REPLACE_WITH_ORCA_PRINTER_PROFILE_NAME",
+    "filament": "REPLACE_WITH_ORCA_FILAMENT_PROFILE_NAME",
+    "process": "REPLACE_WITH_ORCA_PROCESS_PROFILE_NAME"
+  },
+  "notes": "Bu dosya sablondur. Gercek yazici profili eklenmeden basilabilirlik kontrolu ve slicing YAPILMAZ."
+}
