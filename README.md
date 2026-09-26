@@ -52,10 +52,10 @@ prompt -> gereksinim analizi -> eksik kritik olcu -> soru -> parametrik OpenSCAD
 -> SCAD->STL -> STL dogrulama (bbox + delik) -> olcu karsilastirma -> final cikti.
 FAIL ise: teshis -> duzelt -> yeniden uret (max 3 tur) -> cozulmezse FAILED_AFTER_RETRIES.
 
-## Kurulumlar
-- OpenSCAD: `scripts\Resolve-OpenScad.ps1` bulur (bu makinede dogrulandi). Yoksa kur, PATH'e ekle veya `OPENSCAD_EXE` yaz.
-- FreeCAD: `scripts\Resolve-FreeCad.ps1` bulur. OpenSCAD ile cozulebilen modelde zorunlu degil.
-- OrcaSlicer: `scripts\Resolve-OrcaSlicer.ps1` sadece VARLIGI dogrular. Profil eslestirme + G-code SONRAKI FAZ.
+## Kurulumlar (portable resolver sirasi: settings.local > settings > env > tools/ > PATH > bilinen)
+- OpenSCAD: ZORUNLU (yoksa CAD calismaz; dost mesaji + Konum Sec). `tools/openscad/` altina da konabilir.
+- FreeCAD: OPTIONAL. OpenSCAD ile cozulebilen modelde zorunlu degil.
+- OrcaSlicer: OPTIONAL / NOT READY (sadece detection; G-code SONRAKI FAZ).
 
 ## Portable kullanim
 Tum yollar proje root'una goreceli cozulur; hard-coded makine yolu yok. Baska Windows bilgisayara klasoru kopyala, exe'leri kur, resolverlar bulsun.

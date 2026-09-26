@@ -121,8 +121,8 @@ $currentSpecPath = ""
 $pendingQuestions = @()
 
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "3D AI Designer V1.1 (prototip)"
-$form.Size = New-Object System.Drawing.Size(720, 800)
+$form.Text = "3D AI Designer V1.2 (prototip)"
+$form.Size = New-Object System.Drawing.Size(720, 900)
 $form.StartPosition = "CenterScreen"
 
 $lblTitle = New-Object System.Windows.Forms.Label
@@ -289,6 +289,42 @@ $lstWarnings.Location = New-Object System.Drawing.Point(480, 681)
 $lstWarnings.Size = New-Object System.Drawing.Size(200, 60)
 $form.Controls.Add($lstWarnings)
 
+$lblTools = New-Object System.Windows.Forms.Label
+$lblTools.Text = "ARACLAR (first-run denetimi)"
+$lblTools.Location = New-Object System.Drawing.Point(20, 746)
+$lblTools.Size = New-Object System.Drawing.Size(400, 20)
+$form.Controls.Add($lblTools)
+
+$lblToolOS = New-Object System.Windows.Forms.Label
+$lblToolOS.Text = "OpenSCAD: denetlenmedi"
+$lblToolOS.Location = New-Object System.Drawing.Point(20, 768)
+$lblToolOS.Size = New-Object System.Drawing.Size(450, 20)
+$form.Controls.Add($lblToolOS)
+
+$lblToolFC = New-Object System.Windows.Forms.Label
+$lblToolFC.Text = "FreeCAD: denetlenmedi (OPTIONAL)"
+$lblToolFC.Location = New-Object System.Drawing.Point(20, 790)
+$lblToolFC.Size = New-Object System.Drawing.Size(450, 20)
+$form.Controls.Add($lblToolFC)
+
+$lblToolOrca = New-Object System.Windows.Forms.Label
+$lblToolOrca.Text = "OrcaSlicer: denetlenmedi (OPTIONAL / NOT READY)"
+$lblToolOrca.Location = New-Object System.Drawing.Point(20, 812)
+$lblToolOrca.Size = New-Object System.Drawing.Size(450, 20)
+$form.Controls.Add($lblToolOrca)
+
+$btnToolsRefresh = New-Object System.Windows.Forms.Button
+$btnToolsRefresh.Text = "ARACLARI DENETLE"
+$btnToolsRefresh.Location = New-Object System.Drawing.Point(480, 768)
+$btnToolsRefresh.Size = New-Object System.Drawing.Size(200, 30)
+$form.Controls.Add($btnToolsRefresh)
+
+$btnToolOS = New-Object System.Windows.Forms.Button
+$btnToolOS.Text = "OpenSCAD Konum Sec..."
+$btnToolOS.Location = New-Object System.Drawing.Point(480, 803)
+$btnToolOS.Size = New-Object System.Drawing.Size(200, 30)
+$form.Controls.Add($btnToolOS)
+
 $script:lastProjectDir = ""
 $script:lastScad = ""
 $script:lastStl = ""
@@ -334,8 +370,36 @@ function Refresh-Projects {
   foreach ($p in (Get-ProjectList)) { [void]$lstProjects.Items.Add($p.name) }
 }
 function Set-Status($t) { $lblStatus.Text = "Durum: $t"; $form.Refresh() }
+function Save-LocalTool($toolName, $toolPath) {
+  $lf = Join-Path $Root "settings.local.json"
+  $obj = $null
+  if (Test-Path -LiteralPath $lf) {
+    try { $obj = Get-Content -LiteralPath $lf -Raw | ConvertFrom-Json } catch { $obj = $null }
+  }
+  if ($null -eq $obj) { $obj = [pscustomobject]@{ tools = [pscustomobject]@{} } }
+  if ($null -eq $obj.tools) { $obj | Add-Member -NotePropertyName "tools" -NotePropertyValue ([pscustomobject]@{}) -Force }
+  $obj.tools | Add-Member -NotePropertyName $toolName -NotePropertyValue ([string]$toolPath) -Force
+  $obj | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $lf -Encoding UTF8
+}
+function Refresh-Tools {
+  $found = @{ openscad = ""; freecad = ""; orcaslicer = "" }
+  try { $found.openscad = & (Join-Path $Root (Join-Path "scripts" "Resolve-OpenScad.ps1")) 2>&1 | Select-Object -Last 1 } catch { }
+  try { $found.freecad = & (Join-Path $Root (Join-Path "scripts" "Resolve-FreeCad.ps1")) 2>&1 | Select-Object -Last 1 } catch { }
+  try { $found.orcaslicer = & (Join-Path $Root (Join-Path "scripts" "Resolve-OrcaSlicer.ps1")) 2>&1 | Out-String } catch { }
+  if ($found.openscad -and (Test-Path -LiteralPath ([string]$found.openscad))) { $lblToolOS.Text = "OpenSCAD: BULUNDU" }
+  else { $lblToolOS.Text = "OpenSCAD: BULUNAMADI - CAD icin kur veya Konum Sec" }
+  if ($found.freecad -and (Test-Path -LiteralPath ([string]$found.freecad))) { $lblToolFC.Text = "FreeCAD: BULUNDU (OPTIONAL)" }
+  else { $lblToolFC.Text = "FreeCAD: bulunamadi (OPTIONAL - WARNING sayilir)" }
+  if ($found.orcaslicer -and (Test-Path -LiteralPath ([string]$found.orcaslicer))) { $lblToolOrca.Text = "OrcaSlicer: BULUNDU (OPTIONAL / NOT READY)" }
+  else { $lblToolOrca.Text = "OrcaSlicer: bulunamadi (OPTIONAL / NOT READY)" }
+  $form.Refresh()
+  return $found
+}
 function Friendly-Status($result) {
   if ($null -eq $result) { return "islem basarisiz (detay yok)" }
+  $rs = ""
+  if ($result.reason) { $rs = [string]$result.reason }
+  if ($rs -match "OpenSCAD bulunamadi") { return "OpenSCAD bulunamadi. CAD uretmek icin OpenSCAD kurulmali veya executable konumu secilmelidir." }
   if ($result.status -eq "NEEDS_INPUT") { return "eksik kritik bilgi var - soruyu cevapla, model uretilmedi" }
   if ($result.status -eq "BLOCKED") { return ("uretildi-BLOCKED: " + [string]$result.reason) }
   if ($result.status -eq "FAILED") { return ("uretim basarisiz: " + [string]$result.reason) }
@@ -360,6 +424,7 @@ function Fill-ProjectResult($pd, $result) {
   if ($result) { $vs = [string]$result.status }
   [void]$lstResult.Items.Add("VALIDATION: " + $vs)
   [void]$lstResult.Items.Add("G-CODE: NOT AVAILABLE (printer profile required)")
+  if ($result -and $result.reason) { [void]$lstResult.Items.Add("NOT: " + [string]$result.reason) }
   Show-ProjectPanels $pd
   $first = $stls | Select-Object -First 1
   $script:lastScad = ""
@@ -451,5 +516,18 @@ $lstProjects.Add_SelectedIndexChanged({
   Show-ProjectPanels $pd
 })
 
+$btnToolsRefresh.Add_Click({ Refresh-Tools | Out-Null })
+$btnToolOS.Add_Click({
+  $dlg = New-Object System.Windows.Forms.OpenFileDialog
+  $dlg.Filter = "OpenSCAD (openscad.com;openscad.exe)|openscad.com;openscad.exe|Tum dosyalar (*.*)|*.*"
+  $dlg.Title = "OpenSCAD executable konumunu sec"
+  if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    Save-LocalTool "openscad" $dlg.FileName
+    Refresh-Tools | Out-Null
+    Set-Status "OpenSCAD konumu kaydedildi (settings.local.json)"
+  }
+})
+
 Refresh-Projects
+Refresh-Tools | Out-Null
 [void]$form.ShowDialog()

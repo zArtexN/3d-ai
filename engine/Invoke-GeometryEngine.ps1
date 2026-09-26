@@ -83,10 +83,8 @@ if ($dvCode -ne 0) {
 }
 foreach ($dw in @($dv.warnings)) { Write-Output "  $dw" }
 
-# OpenSCAD coz (bir kez)
-$openScad = $null
-if ($gsettings -and $gsettings.openScadExe) { $openScad = $gsettings.openScadExe }
-if (-not $openScad) { $openScad = & (Join-Path $Root (Join-Path "scripts" "Resolve-OpenScad.ps1")) 2>&1 | Select-Object -Last 1 }
+# OpenSCAD coz (bir kez; oncelik resolver icinde: local > settings > env > tools/ > PATH > bilinen)
+$openScad = & (Join-Path $Root (Join-Path "scripts" "Resolve-OpenScad.ps1")) 2>&1 | Select-Object -Last 1
 
 $partResults = New-Object System.Collections.Generic.List[object]
 $projectWarnings = New-Object System.Collections.Generic.List[string]

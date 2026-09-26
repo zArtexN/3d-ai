@@ -43,6 +43,13 @@ SORU/CEVAP GECMISI panelinde saklanir.
 - Kontrol raporu (validation/<parca>.validation.json + project.json)
 - Aciklama (README.md)
 
+## Baska bilgisayarda kullanma (portable)
+1. `3D-AI` klasorunu kopyala (kurulum yok).
+2. Uygulamayi ac; ARACLAR paneli exe'leri otomatik arar.
+3. "OpenSCAD BULUNAMADI" yazarsa: kur veya "OpenSCAD Konum Sec" ile bir kez goster.
+   Secim `settings.local.json` dosyasina kaydolur (bu dosya Git'e gitmez).
+4. FreeCAD/OrcaSlicer yoksa sorun degil (OPTIONAL); CAD/STL calisir.
+
 ## Dikkat edilecekler
 - Olculeri tam yaz (ornek: deligin nerede olacagi). Eksik olcuyu program UYDURMAZ, sorar.
 - G-code (yazici dosyasi) butonu YOK. O is sonraki asamada eklenecek.

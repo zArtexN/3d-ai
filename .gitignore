@@ -1,5 +1,6 @@
 # 3D AI Designer V1
 .opencode/node_modules/
 node_modules/
+settings.local.json
 *.bak
 *.tmp

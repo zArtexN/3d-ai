@@ -136,10 +136,8 @@ if ([System.IO.Path]::GetFullPath($Spec) -ne [System.IO.Path]::GetFullPath($dest
   Copy-Item -LiteralPath $Spec -Destination $destJson -Force
 }
 
-# 4. OpenSCAD coz + export
-$openScad = $null
-if ($settings -and $settings.openScadExe) { $openScad = $settings.openScadExe }
-if (-not $openScad) { $openScad = & (Join-Path $Root (Join-Path "scripts" "Resolve-OpenScad.ps1")) 2>&1 | Select-Object -Last 1 }
+# 4. OpenSCAD coz + export (oncelik resolver icinde: local > settings > env > tools/ > PATH > bilinen)
+$openScad = & (Join-Path $Root (Join-Path "scripts" "Resolve-OpenScad.ps1")) 2>&1 | Select-Object -Last 1
 $outDir = Join-Path $ProjectDir "output"
 $exportScript = Join-Path $Root (Join-Path "scripts" "Export-Stl.ps1")
 $verifyScript = Join-Path $Root (Join-Path "scripts" "Verify-Stl.ps1")
