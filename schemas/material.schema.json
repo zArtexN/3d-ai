@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "3D AI Designer - malzeme profili semasi (gelecek)",
+  "description": "materials/<malzeme>.json dosyalari bu semaya uyar. Deger yoksa null birakilir; sicaklik/hiz gibi degerler UYDURULMAZ. OrcaSlicer filament profili her zaman tek dogruluk kaynagi kalir.",
+  "type": "object",
+  "required": ["material_name", "profile_source"],
+  "properties": {
+    "material_name": { "type": "string", "description": "Or: PLA, PETG, ABS, TPU" },
+    "nozzle_temperature": { "type": ["number", "null"] },
+    "bed_temperature": { "type": ["number", "null"] },
+    "diameter": { "type": ["number", "null"], "description": "Filament capi mm (Or: 1.75)" },
+    "profile_source": { "type": "string", "description": "'orca:PROFIL_ADI' veya 'belirtilmedi'" }
+  }
+}

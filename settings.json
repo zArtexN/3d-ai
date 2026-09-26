@@ -1,0 +1,9 @@
+{
+  "_comment": "3D AI Designer V1 ayarlari. Tum yollar mumkunse null = otomatik resolver dener. Elle yol yazmak resolver'i ezer. OrcaSlicer su asamada sadece bulunabilirlik kontrolu icindir; G-code uretilmez.",
+  "openScadExe": null,
+  "freeCadExe": null,
+  "orcaSlicerExe": null,
+  "projectsDir": "projects",
+  "defaultPrinter": "generic-fdm",
+  "defaultOutput": "output"
+}

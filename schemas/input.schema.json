@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "3D AI Designer - normalize edilmis tasarim verisi (input.json)",
+  "description": "input.md (orijinal prompt) korunur; bu dosya makinenin kullandigi normalize veridir. Promptta olmayan kritik degerler UYDURULMAZ; 'status': 'missing' ile temsil edilir.",
+  "type": "object",
+  "required": ["project_name", "body"],
+  "properties": {
+    "project_name": { "type": "string", "description": "projects/<project_name> klasor adi (kucuk harf, bosluksuz)" },
+    "prompt": { "type": "string", "description": "Orijinal kullanici promptu (input.md ile ayni)" },
+    "body": {
+      "type": "object",
+      "required": ["width_mm", "depth_mm", "height_mm"],
+      "properties": {
+        "width_mm": { "type": "number", "exclusiveMinimum": 0 },
+        "depth_mm": { "type": "number", "exclusiveMinimum": 0 },
+        "height_mm": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "wall_thickness_mm": { "type": ["number", "null"], "description": "null = belirtilmedi (uydurma)" },
+    "holes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "diameter_mm", "through"],
+        "properties": {
+          "id": { "type": "string" },
+          "diameter_mm": { "type": "number", "exclusiveMinimum": 0 },
+          "center_x_mm": { "type": ["number", "null"] },
+          "center_y_mm": { "type": ["number", "null"] },
+          "through": { "type": "boolean", "description": "true = tam gecisli (Z ekseni)" },
+          "status": { "type": "string", "enum": ["ok", "missing"], "description": "Merkez bilinmiyorsa 'missing'; bu durumda model OLUSTURULMAZ" }
+        }
+      }
+    },
+    "cuts": { "type": "array", "description": "Ileride: kesimler (su an engine tarafindan uretilmez)", "items": { "type": "object" } },
+    "walls": { "type": "object", "description": "Ileride: cok duvarli / ici bos govdeler" },
+    "tolerance_mm": { "type": ["number", "null"], "description": "null = belirtilmedi; gecme payi sorulur, uydurulmaz" },
+    "assemblies": { "type": "array", "description": "Ileride: cok parcali montajlar", "items": { "type": "object" } },
+    "material": { "type": ["string", "null"], "description": "null = belirtilmedi" },
+    "orientation": { "type": ["string", "null"], "description": "Or: 'genis-yuz-altta'. null = engine varsayilani (en genis duz yuz)" },
+    "special_requirements": { "type": "array", "items": { "type": "string" } }
+  }
+}

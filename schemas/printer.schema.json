@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "3D AI Designer - yazici profili semasi (gelecek)",
+  "description": "printers/<yazici-id>.json dosyalari bu semaya uyar. Degerler SADECE gercek yazicidan alinir; uydurma profil YASAK. OrcaSlicer profil adlari birebir yazilir.",
+  "type": "object",
+  "required": ["id", "label", "nozzle_mm", "bed_mm", "min_wall_mm", "min_feature_mm", "min_hole_mm", "max_overhang_deg", "orca_profiles"],
+  "properties": {
+    "id": { "type": "string" },
+    "label": { "type": "string" },
+    "nozzle_mm": { "type": "number", "exclusiveMinimum": 0 },
+    "bed_mm": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number", "exclusiveMinimum": 0 } },
+    "min_wall_mm": { "type": "number", "exclusiveMinimum": 0 },
+    "min_feature_mm": { "type": "number", "exclusiveMinimum": 0 },
+    "min_hole_mm": { "type": "number", "exclusiveMinimum": 0 },
+    "max_overhang_deg": { "type": "number", "minimum": 0, "maximum": 90 },
+    "default_clearance_mm": { "type": ["number", "null"], "description": "null birakilir; gecme payi kullanicidan sorulur" },
+    "orca_profiles": {
+      "type": "object",
+      "required": ["printer", "filament", "process"],
+      "properties": {
+        "printer": { "type": "string" },
+        "filament": { "type": "string" },
+        "process": { "type": "string" }
+      }
+    },
+    "notes": { "type": "string" }
+  }
+}
