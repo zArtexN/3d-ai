@@ -1,18 +1,16 @@
 <#
 .SYNOPSIS
-  3D AI Designer V1 - masaustu prototip (PowerShell + WinForms, sifir ek bagimlilik).
+  3D AI Designer V1.3 - dark masaustu (PowerShell + WinForms, sifir ek bagimlilik).
 .DESCRIPTION
-  Mimari: UI -> Design Engine (engine/Invoke-DesignEngine.ps1) -> OpenSCAD -> STL -> Validation.
-  Motorun icine kopyalanmadi; engine scriptlerini relative path ile cagirir (portable).
-  Akis: prompt yaz -> MODEL OLUSTUR -> kucuk parser spec uretir -> eksik kritik olcu
-  varsa soru paneli acar -> CEVAP + DEVAM ET -> engine calisir -> sonuc paneli.
-  G-code BUTONU YOK (bilerek eklenmedi).
-  -SelfTest: pencere acmadan parser + proje listesi + resolver kontrolu yapar (otomatik test icin).
+  Mimari: UI -> Invoke-Pipeline (V1.1) / Analyze-Reference + New-ReferenceSpec -> engine -> OpenSCAD -> STL.
+  Motorlar cagrilir, kopyalanmaz. Yollar relative (portable). G-code BUTONU YOK.
+  Modlar: Tasarla | Referanstan Tasarla | Projeler | Ayarlar.
+  -SelfTest: pencere acmadan parser + proje + resolver kontrolu.
 .EXAMPLE
   powershell -File app\DesignerV1.ps1
   powershell -File app\DesignerV1.ps1 -SelfTest
 #>
-param([switch]$SelfTest)
+param([switch]$SelfTest, [switch]$ValidateUI)
 
 $ErrorActionPreference = "Stop"
 $AppDir = $PSScriptRoot
@@ -36,22 +34,20 @@ function Get-ProjectList {
   if (-not (Test-Path -LiteralPath $pd)) { return @($list) }
   foreach ($d in (Get-ChildItem -LiteralPath $pd -Directory)) {
     if ($d.Name.StartsWith("_")) { continue }
-    $hasScad = Test-Path -LiteralPath (Join-Path $d.FullName (Join-Path "cad" "model.scad"))
-    $hasStl = Test-Path -LiteralPath (Join-Path $d.FullName (Join-Path "output" "model.stl"))
-    $hasVal = Test-Path -LiteralPath (Join-Path $d.FullName (Join-Path "validation" "validation.json"))
+    $hasScad = (Get-ChildItem -LiteralPath (Join-Path $d.FullName "cad") -Filter "*.scad" -ErrorAction SilentlyContinue | Measure-Object).Count -gt 0
+    $hasStl = (Get-ChildItem -LiteralPath (Join-Path $d.FullName "output") -Filter "*.stl" -ErrorAction SilentlyContinue | Measure-Object).Count -gt 0
+    $hasVal = Test-Path -LiteralPath (Join-Path $d.FullName "validation")
     $list.Add([pscustomobject]@{ name = $d.Name; path = $d.FullName; scad = $hasScad; stl = $hasStl; validation = $hasVal })
   }
   return @($list)
 }
 function Convert-PromptToSpec($promptText, $projectName) {
-  # V1 prototip parser: "80x40x20", "delik 25", "duvar 2", "merkez 15,15" kaliblarini okur.
-  # Bulamadigi kritik degerleri missing birakir (UYDURMAZ).
   $spec = [pscustomobject]@{
     project_name = $projectName; prompt = $promptText
     body = $null; wall_thickness_mm = $null; holes = @()
     tolerance_mm = $null; material = $null; orientation = $null; special_requirements = @()
   }
-  $m = [regex]::Match($promptText, '(\d+(?:[.,]\d+)?)\s*[xX×]\s*(\d+(?:[.,]\d+)?)\s*[xX×]\s*(\d+(?:[.,]\d+)?)')
+  $m = [regex]::Match($promptText, '(\d+(?:[.,]\d+)?)\s*[xX\u00d7]\s*(\d+(?:[.,]\d+)?)\s*[xX\u00d7]\s*(\d+(?:[.,]\d+)?)')
   if ($m.Success) {
     $spec.body = [pscustomobject]@{
       width_mm = [double]($m.Groups[1].Value -replace ',', '.')
@@ -113,263 +109,275 @@ if ($SelfTest) {
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+$C_BG = [System.Drawing.ColorTranslator]::FromHtml("#0B0F14")
+$C_PANEL = [System.Drawing.ColorTranslator]::FromHtml("#111821")
+$C_INPUT = [System.Drawing.ColorTranslator]::FromHtml("#161F2A")
+$C_BORDER = [System.Drawing.ColorTranslator]::FromHtml("#253241")
+$C_TEXT = [System.Drawing.ColorTranslator]::FromHtml("#E8EEF5")
+$C_MUTED = [System.Drawing.ColorTranslator]::FromHtml("#8D9AAA")
+$C_ACCENT = [System.Drawing.ColorTranslator]::FromHtml("#20D6C7")
+$C_OK = [System.Drawing.ColorTranslator]::FromHtml("#35D07F")
+$C_WARN = [System.Drawing.ColorTranslator]::FromHtml("#E5B94F")
+$C_ERR = [System.Drawing.ColorTranslator]::FromHtml("#F05D6E")
+
 $projectsDir = Get-ProjectsDir
 $engineScript = Join-Path $Root (Join-Path "engine" "Invoke-DesignEngine.ps1")
 $pipelineScript = Join-Path $Root (Join-Path "engine" "Invoke-Pipeline.ps1")
+$refScript = Join-Path $Root (Join-Path "engine" "Analyze-Reference.ps1")
+$refSpecScript = Join-Path $Root (Join-Path "engine" "New-ReferenceSpec.ps1")
+
 $currentSpec = $null
 $currentSpecPath = ""
 $pendingQuestions = @()
 
+function New-DLabel($txt, $x, $y, $w, $h, $sz) {
+  $l = New-Object System.Windows.Forms.Label
+  $l.Text = $txt
+  $l.Location = New-Object System.Drawing.Point($x, $y)
+  $l.Size = New-Object System.Drawing.Size($w, $h)
+  $l.ForeColor = $C_TEXT
+  $l.BackColor = [System.Drawing.Color]::Transparent
+  if ($sz -gt 0) { $l.Font = New-Object System.Drawing.Font("Segoe UI", $sz, [System.Drawing.FontStyle]::Bold) }
+  else { $l.Font = New-Object System.Drawing.Font("Segoe UI", 9) }
+  return $l
+}
+function New-DButton($txt, $x, $y, $w, $h) {
+  $b = New-Object System.Windows.Forms.Button
+  $b.Text = $txt
+  $b.Location = New-Object System.Drawing.Point($x, $y)
+  $b.Size = New-Object System.Drawing.Size($w, $h)
+  $b.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+  $b.FlatAppearance.BorderColor = $C_BORDER
+  $b.BackColor = $C_INPUT
+  $b.ForeColor = $C_TEXT
+  $b.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+  return $b
+}
+function New-DText($x, $y, $w, $h, $multi) {
+  $t = New-Object System.Windows.Forms.TextBox
+  $t.Location = New-Object System.Drawing.Point($x, $y)
+  $t.Size = New-Object System.Drawing.Size($w, $h)
+  $t.BackColor = $C_INPUT
+  $t.ForeColor = $C_TEXT
+  $t.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+  $t.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+  if ($multi) { $t.Multiline = $true; $t.ScrollBars = "Vertical" }
+  return $t
+}
+function New-DList($x, $y, $w, $h) {
+  $l = New-Object System.Windows.Forms.ListBox
+  $l.Location = New-Object System.Drawing.Point($x, $y)
+  $l.Size = New-Object System.Drawing.Size($w, $h)
+  $l.BackColor = $C_INPUT
+  $l.ForeColor = $C_TEXT
+  $l.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+  $l.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+  return $l
+}
+function New-DBadge($txt, $x, $y, $w) {
+  $l = New-DLabel $txt $x $y $w 24 0
+  $l.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+  $l.BackColor = $C_BORDER
+  return $l
+}
+
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "3D AI Designer V1.2 (prototip)"
-$form.Size = New-Object System.Drawing.Size(720, 900)
+$form.Text = "3D AI Designer V1.3"
+$form.Size = New-Object System.Drawing.Size(1120, 720)
 $form.StartPosition = "CenterScreen"
+$form.BackColor = $C_BG
+$form.ForeColor = $C_TEXT
 
-$lblTitle = New-Object System.Windows.Forms.Label
-$lblTitle.Text = "3D AI DESIGNER"
-$lblTitle.Font = New-Object System.Drawing.Font("Segoe UI", 16, [System.Drawing.FontStyle]::Bold)
-$lblTitle.Location = New-Object System.Drawing.Point(20, 10)
-$lblTitle.Size = New-Object System.Drawing.Size(400, 35)
-$form.Controls.Add($lblTitle)
+$side = New-Object System.Windows.Forms.Panel
+$side.Location = New-Object System.Drawing.Point(0, 0)
+$side.Size = New-Object System.Drawing.Size(180, 700)
+$side.BackColor = $C_PANEL
+$form.Controls.Add($side)
 
-$lblProvider = New-Object System.Windows.Forms.Label
-$lblProvider.Text = "AI Provider: MOCK (test - gercek AI degil)"
-$lblProvider.Location = New-Object System.Drawing.Point(480, 10)
-$lblProvider.Size = New-Object System.Drawing.Size(200, 35)
-$form.Controls.Add($lblProvider)
+$sideTitle = New-DLabel "3D AI`nDESIGNER" 15 12 150 50 13
+$side.Controls.Add($sideTitle)
+$btnNavNew = New-DButton "Yeni Proje" 15 75 150 34
+$btnNavDesign = New-DButton "Tasarla" 15 115 150 34
+$btnNavRef = New-DButton "Referanstan Tasarla" 15 155 150 34
+$btnNavProj = New-DButton "Projeler" 15 195 150 34
+$btnNavSet = New-DButton "Ayarlar" 15 235 150 34
+foreach ($b in @($btnNavNew, $btnNavDesign, $btnNavRef, $btnNavProj, $btnNavSet)) { $side.Controls.Add($b) }
+$lblProvSide = New-DLabel "AI Provider:`nMOCK (test)" 15 620 150 50 0
+$lblProvSide.ForeColor = $C_MUTED
+$side.Controls.Add($lblProvSide)
 
-$lblAsk = New-Object System.Windows.Forms.Label
-$lblAsk.Text = "Ne yapmak istiyorsun?"
-$lblAsk.Location = New-Object System.Drawing.Point(20, 50)
-$lblAsk.Size = New-Object System.Drawing.Size(400, 20)
-$form.Controls.Add($lblAsk)
+$center = New-Object System.Windows.Forms.Panel
+$center.Location = New-Object System.Drawing.Point(180, 0)
+$center.Size = New-Object System.Drawing.Size(560, 700)
+$center.BackColor = $C_BG
+$form.Controls.Add($center)
 
-$txtPrompt = New-Object System.Windows.Forms.TextBox
-$txtPrompt.Multiline = $true
-$txtPrompt.ScrollBars = "Vertical"
-$txtPrompt.Location = New-Object System.Drawing.Point(20, 72)
-$txtPrompt.Size = New-Object System.Drawing.Size(450, 90)
+$right = New-Object System.Windows.Forms.Panel
+$right.Location = New-Object System.Drawing.Point(740, 0)
+$right.Size = New-Object System.Drawing.Size(365, 700)
+$right.BackColor = $C_PANEL
+$form.Controls.Add($right)
+
+function New-ModePanel {
+  $p = New-Object System.Windows.Forms.Panel
+  $p.Location = New-Object System.Drawing.Point(0, 0)
+  $p.Size = New-Object System.Drawing.Size(560, 700)
+  $p.BackColor = $C_BG
+  $p.Visible = $false
+  $center.Controls.Add($p)
+  return $p
+}
+$pnlDesign = New-ModePanel
+$pnlRef = New-ModePanel
+$pnlProj = New-ModePanel
+$pnlSet = New-ModePanel
+$script:uiMode = ""
+function Show-Mode($p) {
+  foreach ($m in @($pnlDesign, $pnlRef, $pnlProj, $pnlSet)) { $m.Visible = $false }
+  $p.Visible = $true
+  if ($p -eq $pnlDesign) { $script:uiMode = "design" }
+  elseif ($p -eq $pnlRef) { $script:uiMode = "ref" }
+  elseif ($p -eq $pnlProj) { $script:uiMode = "proj" }
+  else { $script:uiMode = "set" }
+}
+
+# ---- TASARLA ----
+$pnlDesign.Controls.Add((New-DLabel "Tasarim Olustur" 20 12 500 32 15))
+$pnlDesign.Controls.Add((New-DLabel "Dogal dil ile ne uretmek istiyorsun?" 20 50 500 20 0))
+$txtPrompt = New-DText 20 74 520 86 $true
 $txtPrompt.Text = "80x40x20 mm kutu yap, delik 25, duvar 2"
-$form.Controls.Add($txtPrompt)
-
-$btnCreate = New-Object System.Windows.Forms.Button
-$btnCreate.Text = "MODEL OLUSTUR"
-$btnCreate.Location = New-Object System.Drawing.Point(480, 72)
-$btnCreate.Size = New-Object System.Drawing.Size(200, 40)
-$form.Controls.Add($btnCreate)
-
-$lblStatus = New-Object System.Windows.Forms.Label
-$lblStatus.Text = "Durum: hazir"
-$lblStatus.Location = New-Object System.Drawing.Point(20, 170)
-$lblStatus.Size = New-Object System.Drawing.Size(660, 20)
-$form.Controls.Add($lblStatus)
-
-$lblQ = New-Object System.Windows.Forms.Label
-$lblQ.Text = "Sorular:"
-$lblQ.Location = New-Object System.Drawing.Point(20, 195)
-$lblQ.Size = New-Object System.Drawing.Size(400, 20)
-$form.Controls.Add($lblQ)
-
-$txtQuestion = New-Object System.Windows.Forms.TextBox
-$txtQuestion.Multiline = $true
+$pnlDesign.Controls.Add($txtPrompt)
+$btnCreate = New-DButton "TASARLA" 20 168 520 40
+$btnCreate.BackColor = $C_ACCENT
+$btnCreate.ForeColor = [System.Drawing.Color]::Black
+$pnlDesign.Controls.Add($btnCreate)
+$lblStatus = New-DLabel "Durum: hazir" 20 214 520 20 0
+$lblStatus.ForeColor = $C_MUTED
+$pnlDesign.Controls.Add($lblStatus)
+$pnlDesign.Controls.Add((New-DLabel "SORULAR" 20 240 520 20 0))
+$txtQuestion = New-DText 20 262 520 56 $true
 $txtQuestion.ReadOnly = $true
-$txtQuestion.ScrollBars = "Vertical"
-$txtQuestion.Location = New-Object System.Drawing.Point(20, 217)
-$txtQuestion.Size = New-Object System.Drawing.Size(450, 60)
-$form.Controls.Add($txtQuestion)
-
-$txtAnswer = New-Object System.Windows.Forms.TextBox
-$txtAnswer.Location = New-Object System.Drawing.Point(20, 282)
-$txtAnswer.Size = New-Object System.Drawing.Size(450, 23)
+$pnlDesign.Controls.Add($txtQuestion)
+$txtAnswer = New-DText 20 322 350 26 $false
 $txtAnswer.Enabled = $false
-$form.Controls.Add($txtAnswer)
-
-$btnContinue = New-Object System.Windows.Forms.Button
-$btnContinue.Text = "DEVAM ET"
-$btnContinue.Location = New-Object System.Drawing.Point(480, 282)
-$btnContinue.Size = New-Object System.Drawing.Size(200, 30)
+$pnlDesign.Controls.Add($txtAnswer)
+$btnContinue = New-DButton "DEVAM ET" 378 322 162 26
 $btnContinue.Enabled = $false
-$form.Controls.Add($btnContinue)
+$pnlDesign.Controls.Add($btnContinue)
+$pnlDesign.Controls.Add((New-DLabel "PIPELINE DURUMU" 20 356 520 20 0))
+$badgeSpec = New-DBadge "DesignSpec -" 20 380 120
+$badgeCAD = New-DBadge "CAD -" 148 380 120
+$badgeSTL = New-DBadge "STL -" 276 380 120
+$badgeVal = New-DBadge "Validation -" 404 380 116
+$pnlDesign.Controls.Add($badgeSpec)
+$pnlDesign.Controls.Add($badgeCAD)
+$pnlDesign.Controls.Add($badgeSTL)
+$pnlDesign.Controls.Add($badgeVal)
+$badgeGcode = New-DBadge "G-Code: NOT AVAILABLE" 20 408 500
+$badgeGcode.BackColor = $C_BORDER
+$badgeGcode.ForeColor = $C_MUTED
+$pnlDesign.Controls.Add($badgeGcode)
+$pnlDesign.Controls.Add((New-DLabel "DETAY" 20 438 520 20 0))
+$lstResult = New-DList 20 460 520 200
+$pnlDesign.Controls.Add($lstResult)
 
-$lblResult = New-Object System.Windows.Forms.Label
-$lblResult.Text = "Sonuc:"
-$lblResult.Location = New-Object System.Drawing.Point(20, 315)
-$lblResult.Size = New-Object System.Drawing.Size(400, 20)
-$form.Controls.Add($lblResult)
+# ---- REFERANS ----
+$pnlRef.Controls.Add((New-DLabel "Referanstan Tasarla" 20 12 500 32 15))
+$pnlRef.Controls.Add((New-DLabel "REFERANS MODEL" 20 50 500 20 0))
+$txtRefUrl = New-DText 20 72 520 26 $false
+$pnlRef.Controls.Add($txtRefUrl)
+$btnRefBrowse = New-DButton "Dosya Sec (STL/3MF/STEP)" 20 104 250 30
+$pnlRef.Controls.Add($btnRefBrowse)
+$lblRefFile = New-DLabel "dosya secilmedi" 278 104 242 30 0
+$lblRefFile.ForeColor = $C_MUTED
+$pnlRef.Controls.Add($lblRefFile)
+$btnRefAnalyze = New-DButton "Referansi Analiz Et" 20 140 520 34
+$btnRefAnalyze.BackColor = $C_ACCENT
+$btnRefAnalyze.ForeColor = [System.Drawing.Color]::Black
+$pnlRef.Controls.Add($btnRefAnalyze)
+$lstRefResult = New-DList 20 182 520 150
+$pnlRef.Controls.Add($lstRefResult)
+$pnlRef.Controls.Add((New-DLabel "DEGISIKLIK KOMUTU (orn: aynisini yap ama deligi 8 mm olsun)" 20 340 520 20 0))
+$txtRefMod = New-DText 20 362 520 60 $true
+$txtRefMod.Text = "Bu parcanin aynisini yap."
+$pnlRef.Controls.Add($txtRefMod)
+$btnRefBuild = New-DButton "Referanstan Uret" 20 428 520 36
+$btnRefBuild.Enabled = $false
+$pnlRef.Controls.Add($btnRefBuild)
+$pnlRef.Controls.Add((New-DLabel "Olcu bilinmiyorsa uydurulmaz, sorulur." 20 470 520 20 0))
 
-$lstResult = New-Object System.Windows.Forms.ListBox
-$lstResult.Location = New-Object System.Drawing.Point(20, 337)
-$lstResult.Size = New-Object System.Drawing.Size(450, 80)
-$form.Controls.Add($lstResult)
-
-$btnScad = New-Object System.Windows.Forms.Button
-$btnScad.Text = "SCAD'I AC"
-$btnScad.Location = New-Object System.Drawing.Point(480, 337)
-$btnScad.Size = New-Object System.Drawing.Size(200, 30)
-$btnScad.Enabled = $false
-$form.Controls.Add($btnScad)
-
-$btnStl = New-Object System.Windows.Forms.Button
-$btnStl.Text = "STL'YI AC"
-$btnStl.Location = New-Object System.Drawing.Point(480, 372)
-$btnStl.Size = New-Object System.Drawing.Size(200, 30)
-$btnStl.Enabled = $false
-$form.Controls.Add($btnStl)
-
-$btnFolder = New-Object System.Windows.Forms.Button
-$btnFolder.Text = "PROJE KLASORU"
-$btnFolder.Location = New-Object System.Drawing.Point(480, 407)
-$btnFolder.Size = New-Object System.Drawing.Size(200, 30)
-$btnFolder.Enabled = $false
-$form.Controls.Add($btnFolder)
-
-$lblProjects = New-Object System.Windows.Forms.Label
-$lblProjects.Text = "Projects"
-$lblProjects.Location = New-Object System.Drawing.Point(20, 425)
-$lblProjects.Size = New-Object System.Drawing.Size(400, 20)
-$form.Controls.Add($lblProjects)
-
-$lstProjects = New-Object System.Windows.Forms.ListBox
-$lstProjects.Location = New-Object System.Drawing.Point(20, 447)
-$lstProjects.Size = New-Object System.Drawing.Size(450, 120)
-$form.Controls.Add($lstProjects)
-
-$txtDetail = New-Object System.Windows.Forms.TextBox
-$txtDetail.Multiline = $true
+# ---- PROJELER ----
+$pnlProj.Controls.Add((New-DLabel "Projeler" 20 12 500 32 15))
+$lstProjects = New-DList 20 50 520 200
+$pnlProj.Controls.Add($lstProjects)
+$txtDetail = New-DText 20 258 520 200 $true
 $txtDetail.ReadOnly = $true
-$txtDetail.ScrollBars = "Vertical"
-$txtDetail.Location = New-Object System.Drawing.Point(480, 447)
-$txtDetail.Size = New-Object System.Drawing.Size(200, 120)
-$form.Controls.Add($txtDetail)
+$pnlProj.Controls.Add($txtDetail)
 
-$lblParts = New-Object System.Windows.Forms.Label
-$lblParts.Text = "PARCALAR"
-$lblParts.Location = New-Object System.Drawing.Point(20, 572)
-$lblParts.Size = New-Object System.Drawing.Size(400, 20)
-$form.Controls.Add($lblParts)
+# ---- AYARLAR ----
+$pnlSet.Controls.Add((New-DLabel "Ayarlar" 20 12 500 32 15))
+$lblToolOS = New-DLabel "OpenSCAD: denetlenmedi" 20 60 500 24 0
+$lblToolFC = New-DLabel "FreeCAD: denetlenmedi (OPTIONAL)" 20 88 500 24 0
+$lblToolOrca = New-DLabel "OrcaSlicer: denetlenmedi (OPTIONAL / NOT READY)" 20 116 500 24 0
+$pnlSet.Controls.Add($lblToolOS)
+$pnlSet.Controls.Add($lblToolFC)
+$pnlSet.Controls.Add($lblToolOrca)
+$btnToolsRefresh = New-DButton "ARACLARI DENETLE" 20 150 250 32
+$pnlSet.Controls.Add($btnToolsRefresh)
+$btnToolOS = New-DButton "OpenSCAD Konum Sec..." 278 150 242 32
+$pnlSet.Controls.Add($btnToolOS)
+$pnlSet.Controls.Add((New-DLabel "AI Provider: MOCK (test - gercek AI degil)" 20 200 500 24 0))
+$pnlSet.Controls.Add((New-DLabel "Secimler settings.local.json dosyasina kaydolur (git disi)." 20 228 500 24 0))
 
-$lstParts = New-Object System.Windows.Forms.ListBox
-$lstParts.Location = New-Object System.Drawing.Point(20, 594)
-$lstParts.Size = New-Object System.Drawing.Size(450, 60)
-$form.Controls.Add($lstParts)
-
-$lblVal = New-Object System.Windows.Forms.Label
-$lblVal.Text = "VALIDATION"
-$lblVal.Location = New-Object System.Drawing.Point(480, 572)
-$lblVal.Size = New-Object System.Drawing.Size(200, 20)
-$form.Controls.Add($lblVal)
-
-$lstValidation = New-Object System.Windows.Forms.ListBox
-$lstValidation.Location = New-Object System.Drawing.Point(480, 594)
-$lstValidation.Size = New-Object System.Drawing.Size(200, 60)
-$form.Controls.Add($lstValidation)
-
-$lblHist = New-Object System.Windows.Forms.Label
-$lblHist.Text = "SORU/CEVAP GECMISI"
-$lblHist.Location = New-Object System.Drawing.Point(20, 659)
-$lblHist.Size = New-Object System.Drawing.Size(400, 20)
-$form.Controls.Add($lblHist)
-
-$txtHistory = New-Object System.Windows.Forms.TextBox
-$txtHistory.Multiline = $true
+# ---- SAG PANEL ----
+$right.Controls.Add((New-DLabel "PROJE" 15 12 330 28 13))
+$lblProjName = New-DLabel "-" 15 44 330 22 0
+$lblProjName.ForeColor = $C_ACCENT
+$right.Controls.Add($lblProjName)
+$right.Controls.Add((New-DLabel "PARCALAR" 15 72 330 20 0))
+$lstParts = New-DList 15 94 330 90
+$right.Controls.Add($lstParts)
+$right.Controls.Add((New-DLabel "VALIDATION" 15 190 330 20 0))
+$lstValidation = New-DList 15 212 330 90
+$right.Controls.Add($lstValidation)
+$right.Controls.Add((New-DLabel "UYARILAR" 15 308 330 20 0))
+$lstWarnings = New-DList 15 330 330 80
+$right.Controls.Add($lstWarnings)
+$right.Controls.Add((New-DLabel "SORU/CEVAP GECMISI" 15 416 330 20 0))
+$txtHistory = New-DText 15 438 330 90 $true
 $txtHistory.ReadOnly = $true
-$txtHistory.ScrollBars = "Vertical"
-$txtHistory.Location = New-Object System.Drawing.Point(20, 681)
-$txtHistory.Size = New-Object System.Drawing.Size(450, 60)
-$form.Controls.Add($txtHistory)
-
-$lblWarn = New-Object System.Windows.Forms.Label
-$lblWarn.Text = "UYARILAR"
-$lblWarn.Location = New-Object System.Drawing.Point(480, 659)
-$lblWarn.Size = New-Object System.Drawing.Size(200, 20)
-$form.Controls.Add($lblWarn)
-
-$lstWarnings = New-Object System.Windows.Forms.ListBox
-$lstWarnings.Location = New-Object System.Drawing.Point(480, 681)
-$lstWarnings.Size = New-Object System.Drawing.Size(200, 60)
-$form.Controls.Add($lstWarnings)
-
-$lblTools = New-Object System.Windows.Forms.Label
-$lblTools.Text = "ARACLAR (first-run denetimi)"
-$lblTools.Location = New-Object System.Drawing.Point(20, 746)
-$lblTools.Size = New-Object System.Drawing.Size(400, 20)
-$form.Controls.Add($lblTools)
-
-$lblToolOS = New-Object System.Windows.Forms.Label
-$lblToolOS.Text = "OpenSCAD: denetlenmedi"
-$lblToolOS.Location = New-Object System.Drawing.Point(20, 768)
-$lblToolOS.Size = New-Object System.Drawing.Size(450, 20)
-$form.Controls.Add($lblToolOS)
-
-$lblToolFC = New-Object System.Windows.Forms.Label
-$lblToolFC.Text = "FreeCAD: denetlenmedi (OPTIONAL)"
-$lblToolFC.Location = New-Object System.Drawing.Point(20, 790)
-$lblToolFC.Size = New-Object System.Drawing.Size(450, 20)
-$form.Controls.Add($lblToolFC)
-
-$lblToolOrca = New-Object System.Windows.Forms.Label
-$lblToolOrca.Text = "OrcaSlicer: denetlenmedi (OPTIONAL / NOT READY)"
-$lblToolOrca.Location = New-Object System.Drawing.Point(20, 812)
-$lblToolOrca.Size = New-Object System.Drawing.Size(450, 20)
-$form.Controls.Add($lblToolOrca)
-
-$btnToolsRefresh = New-Object System.Windows.Forms.Button
-$btnToolsRefresh.Text = "ARACLARI DENETLE"
-$btnToolsRefresh.Location = New-Object System.Drawing.Point(480, 768)
-$btnToolsRefresh.Size = New-Object System.Drawing.Size(200, 30)
-$form.Controls.Add($btnToolsRefresh)
-
-$btnToolOS = New-Object System.Windows.Forms.Button
-$btnToolOS.Text = "OpenSCAD Konum Sec..."
-$btnToolOS.Location = New-Object System.Drawing.Point(480, 803)
-$btnToolOS.Size = New-Object System.Drawing.Size(200, 30)
-$form.Controls.Add($btnToolOS)
+$right.Controls.Add($txtHistory)
+$btnScad = New-DButton "SCAD'I AC" 15 536 105 30
+$btnStl = New-DButton "STL'YI AC" 126 536 105 30
+$btnFolder = New-DButton "KLASORU AC" 237 536 108 30
+$btnScad.Enabled = $false; $btnStl.Enabled = $false; $btnFolder.Enabled = $false
+$right.Controls.Add($btnScad)
+$right.Controls.Add($btnStl)
+$right.Controls.Add($btnFolder)
 
 $script:lastProjectDir = ""
 $script:lastScad = ""
 $script:lastStl = ""
 $script:pipeName = ""
+$script:pipePrompt = ""
+$script:pipeRefSpec = ""
 $script:pipeQuestions = @()
 $script:pipeAnswers = @{}
 $script:history = New-Object System.Collections.Generic.List[string]
+$script:refJson = ""
+$script:refStage = ""
 
+function Set-Status($t) { $lblStatus.Text = "Durum: $t"; $form.Refresh() }
 function Add-History($t) {
   $script:history.Add($t)
   $txtHistory.Lines = $script:history.ToArray()
 }
-function Show-ProjectPanels($pd) {
-  $lstParts.Items.Clear(); $lstValidation.Items.Clear(); $lstWarnings.Items.Clear()
-  $pj = Join-Path $pd "project.json"
-  if (Test-Path -LiteralPath $pj) {
-    $p = Get-Content -LiteralPath $pj -Raw | ConvertFrom-Json
-    foreach ($part in @($p.parts)) { [void]$lstParts.Items.Add("$($part.id): $($part.status)") }
-    [void]$lstValidation.Items.Add("proje: $($p.validation_status)")
-  } else {
-    foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $pd "output") -Filter "*.stl" -ErrorAction SilentlyContinue)) {
-      [void]$lstParts.Items.Add($f.Name)
-    }
-  }
-  $vd = Join-Path $pd "validation"
-  if (Test-Path -LiteralPath $vd) {
-    foreach ($f in (Get-ChildItem -LiteralPath $vd -Filter "*.json")) {
-      try {
-        $v = Get-Content -LiteralPath $f.FullName -Raw | ConvertFrom-Json
-        [void]$lstValidation.Items.Add("$($f.BaseName): $($v.status)")
-        if ($v.categories) {
-          [void]$lstValidation.Items.Add("  GEO:$($v.categories.geometry) FEAT:$($v.categories.feature) ASM:$($v.categories.assembly) MFG:$($v.categories.manufacturability)")
-        }
-        foreach ($w in @($v.warnings)) { [void]$lstWarnings.Items.Add([string]$w) }
-        foreach ($w in @($v.design_warnings)) { [void]$lstWarnings.Items.Add([string]$w) }
-      } catch { }
-    }
-  }
+function Set-Badge($b, $txt, $color) {
+  $b.Text = $txt
+  $b.BackColor = $color
+  if ($color -eq $C_BORDER) { $b.ForeColor = $C_MUTED } else { $b.ForeColor = [System.Drawing.Color]::Black }
+  $form.Refresh()
 }
-
-function Refresh-Projects {
-  $lstProjects.Items.Clear()
-  foreach ($p in (Get-ProjectList)) { [void]$lstProjects.Items.Add($p.name) }
-}
-function Set-Status($t) { $lblStatus.Text = "Durum: $t"; $form.Refresh() }
 function Save-LocalTool($toolName, $toolPath) {
   $lf = Join-Path $Root "settings.local.json"
   $obj = $null
@@ -382,27 +390,61 @@ function Save-LocalTool($toolName, $toolPath) {
   $obj | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $lf -Encoding UTF8
 }
 function Refresh-Tools {
-  $found = @{ openscad = ""; freecad = ""; orcaslicer = "" }
-  try { $found.openscad = & (Join-Path $Root (Join-Path "scripts" "Resolve-OpenScad.ps1")) 2>&1 | Select-Object -Last 1 } catch { }
-  try { $found.freecad = & (Join-Path $Root (Join-Path "scripts" "Resolve-FreeCad.ps1")) 2>&1 | Select-Object -Last 1 } catch { }
-  try { $found.orcaslicer = & (Join-Path $Root (Join-Path "scripts" "Resolve-OrcaSlicer.ps1")) 2>&1 | Out-String } catch { }
-  if ($found.openscad -and (Test-Path -LiteralPath ([string]$found.openscad))) { $lblToolOS.Text = "OpenSCAD: BULUNDU" }
-  else { $lblToolOS.Text = "OpenSCAD: BULUNAMADI - CAD icin kur veya Konum Sec" }
-  if ($found.freecad -and (Test-Path -LiteralPath ([string]$found.freecad))) { $lblToolFC.Text = "FreeCAD: BULUNDU (OPTIONAL)" }
-  else { $lblToolFC.Text = "FreeCAD: bulunamadi (OPTIONAL - WARNING sayilir)" }
-  if ($found.orcaslicer -and (Test-Path -LiteralPath ([string]$found.orcaslicer))) { $lblToolOrca.Text = "OrcaSlicer: BULUNDU (OPTIONAL / NOT READY)" }
-  else { $lblToolOrca.Text = "OrcaSlicer: bulunamadi (OPTIONAL / NOT READY)" }
+  $fOS = ""; $fFC = ""; $fOrca = ""
+  try { $fOS = & (Join-Path $Root (Join-Path "scripts" "Resolve-OpenScad.ps1")) 2>&1 | Select-Object -Last 1 } catch { }
+  try { $fFC = & (Join-Path $Root (Join-Path "scripts" "Resolve-FreeCad.ps1")) 2>&1 | Select-Object -Last 1 } catch { }
+  try { $fOrca = & (Join-Path $Root (Join-Path "scripts" "Resolve-OrcaSlicer.ps1")) 2>&1 | Select-Object -Last 1 } catch { }
+  if ($fOS -and (Test-Path -LiteralPath ([string]$fOS))) { $lblToolOS.Text = "OpenSCAD: BULUNDU"; $lblToolOS.ForeColor = $C_OK }
+  else { $lblToolOS.Text = "OpenSCAD: BULUNAMADI - CAD icin kur veya Konum Sec"; $lblToolOS.ForeColor = $C_ERR }
+  if ($fFC -and (Test-Path -LiteralPath ([string]$fFC))) { $lblToolFC.Text = "FreeCAD: BULUNDU (OPTIONAL)"; $lblToolFC.ForeColor = $C_OK }
+  else { $lblToolFC.Text = "FreeCAD: bulunamadi (OPTIONAL - WARNING sayilir)"; $lblToolFC.ForeColor = $C_WARN }
+  if ($fOrca -and (Test-Path -LiteralPath ([string]$fOrca))) { $lblToolOrca.Text = "OrcaSlicer: BULUNDU (OPTIONAL / NOT READY)"; $lblToolOrca.ForeColor = $C_OK }
+  else { $lblToolOrca.Text = "OrcaSlicer: bulunamadi (OPTIONAL / NOT READY)"; $lblToolOrca.ForeColor = $C_WARN }
   $form.Refresh()
-  return $found
+}
+function Show-ProjectPanels($pd) {
+  $lstParts.Items.Clear(); $lstValidation.Items.Clear(); $lstWarnings.Items.Clear()
+  $lblProjName.Text = Split-Path -Leaf $pd
+  $pj = Join-Path $pd "project.json"
+  if (Test-Path -LiteralPath $pj) {
+    try {
+      $p = Get-Content -LiteralPath $pj -Raw | ConvertFrom-Json
+      foreach ($part in @($p.parts)) { [void]$lstParts.Items.Add("$($part.id): $($part.status)") }
+      [void]$lstValidation.Items.Add("proje: $($p.validation_status)")
+    } catch { }
+  } else {
+    foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $pd "output") -Filter "*.stl" -ErrorAction SilentlyContinue)) {
+      [void]$lstParts.Items.Add($f.Name)
+    }
+  }
+  $vd = Join-Path $pd "validation"
+  if (Test-Path -LiteralPath $vd) {
+    foreach ($f in (Get-ChildItem -LiteralPath $vd -Filter "*.json")) {
+      try {
+        $v = Get-Content -LiteralPath $f.FullName -Raw | ConvertFrom-Json
+        $vn = ([string]$f.BaseName -replace '\.validation$', '')
+        [void]$lstValidation.Items.Add("$vn : $($v.status)")
+        if ($v.categories) {
+          [void]$lstValidation.Items.Add("  GEO:$($v.categories.geometry) FEAT:$($v.categories.feature) ASM:$($v.categories.assembly) MFG:$($v.categories.manufacturability)")
+        }
+        foreach ($w in @($v.warnings)) { [void]$lstWarnings.Items.Add([string]$w) }
+        foreach ($w in @($v.design_warnings)) { [void]$lstWarnings.Items.Add([string]$w) }
+      } catch { }
+    }
+  }
+}
+function Refresh-Projects {
+  $lstProjects.Items.Clear()
+  foreach ($p in (Get-ProjectList)) { [void]$lstProjects.Items.Add($p.name) }
 }
 function Friendly-Status($result) {
   if ($null -eq $result) { return "islem basarisiz (detay yok)" }
   $rs = ""
   if ($result.reason) { $rs = [string]$result.reason }
-  if ($rs -match "OpenSCAD bulunamadi") { return "OpenSCAD bulunamadi. CAD uretmek icin OpenSCAD kurulmali veya executable konumu secilmelidir." }
+  if ($rs -match "OpenSCAD bulunamadi") { return "OpenSCAD bulunamadi. CAD uretmek icin OpenSCAD kurulmali veya Ayarlar > Araclar > Konum Sec ile gosterilmelidir." }
   if ($result.status -eq "NEEDS_INPUT") { return "eksik kritik bilgi var - soruyu cevapla, model uretilmedi" }
-  if ($result.status -eq "BLOCKED") { return ("uretildi-BLOCKED: " + [string]$result.reason) }
-  if ($result.status -eq "FAILED") { return ("uretim basarisiz: " + [string]$result.reason) }
+  if ($result.status -eq "BLOCKED") { return ("uretildi-BLOCKED: " + $rs) }
+  if ($result.status -eq "FAILED") { return ("uretim basarisiz: " + $rs) }
   return [string]$result.status
 }
 function Fill-ProjectResult($pd, $result) {
@@ -413,16 +455,25 @@ function Fill-ProjectResult($pd, $result) {
   if ($result -and $result.parts) { $nParts = @($result.parts).Count }
   [void]$lstResult.Items.Add("DESIGN: " + $nParts + " parca")
   $stls = @(Get-ChildItem -LiteralPath (Join-Path $pd "output") -Filter "*.stl" -ErrorAction SilentlyContinue)
+  $vstat = "yok"
+  if ($result) { $vstat = [string]$result.status }
   if ($stls.Count -gt 0) {
+    Set-Badge $badgeCAD "CAD: PASS" $C_OK
+    Set-Badge $badgeSTL ("STL: PASS (" + $stls.Count + ")") $C_OK
     [void]$lstResult.Items.Add("CAD: PASS")
     [void]$lstResult.Items.Add("STL: PASS (" + $stls.Count + " dosya)")
   } else {
+    Set-Badge $badgeCAD "CAD: yok" $C_ERR
+    Set-Badge $badgeSTL "STL: yok" $C_ERR
     [void]$lstResult.Items.Add("CAD: yok")
     [void]$lstResult.Items.Add("STL: yok")
   }
-  $vs = "yok"
-  if ($result) { $vs = [string]$result.status }
-  [void]$lstResult.Items.Add("VALIDATION: " + $vs)
+  if ($vstat -eq "PASS") { Set-Badge $badgeVal "Validation: PASS" $C_OK }
+  elseif ($vstat -eq "WARNING") { Set-Badge $badgeVal "Validation: WARNING" $C_WARN }
+  elseif ($vstat -eq "NEEDS_INPUT" -or $vstat -eq "BLOCKED" -or $vstat -eq "FAILED") { Set-Badge $badgeVal ("Validation: " + $vstat) $C_ERR }
+  else { Set-Badge $badgeVal "Validation: -" $C_BORDER }
+  Set-Badge $badgeSpec "DesignSpec: v2" $C_OK
+  [void]$lstResult.Items.Add("VALIDATION: " + $vstat)
   [void]$lstResult.Items.Add("G-CODE: NOT AVAILABLE (printer profile required)")
   if ($result -and $result.reason) { [void]$lstResult.Items.Add("NOT: " + [string]$result.reason) }
   Show-ProjectPanels $pd
@@ -434,23 +485,32 @@ function Fill-ProjectResult($pd, $result) {
     $maybeScad = Join-Path $pd (Join-Path "cad" ([System.IO.Path]::GetFileNameWithoutExtension($first.Name) + ".scad"))
     if (Test-Path -LiteralPath $maybeScad) { $script:lastScad = $maybeScad }
   }
-  $hasFiles = ($script:lastStl -ne "")
   $btnScad.Enabled = ($script:lastScad -ne "")
-  $btnStl.Enabled = $hasFiles
+  $btnStl.Enabled = ($script:lastStl -ne "")
   $btnFolder.Enabled = $true
 }
 function Run-Pipeline($answersFile) {
   Set-Status "pipeline calisiyor (parser -> engine -> validation)..."
   try {
-    $pargs = @("-Prompt", $txtPrompt.Text, "-ProjectName", $script:pipeName)
-    if ($answersFile -ne "") { $pargs += @("-AnswersFile", $answersFile) }
+    $prompt = $txtPrompt.Text
+    if ($script:pipePrompt -ne "") { $prompt = $script:pipePrompt }
+    $pargs = @{ Prompt = $prompt; ProjectName = $script:pipeName; ProjectDir = $script:lastProjectDir }
+    if ($script:pipeRefSpec -ne "") { $pargs.RefSpecFile = $script:pipeRefSpec }
+    if ($answersFile -ne "") { $pargs.AnswersFile = $answersFile }
     $o = & $pipelineScript @pargs 2>&1 | Out-String
     $resPath = Join-Path $script:lastProjectDir "pipeline-result.json"
     $result = $null
-    if (Test-Path -LiteralPath $resPath) { $result = Get-Content -LiteralPath $resPath -Raw | ConvertFrom-Json }
+    if (Test-Path -LiteralPath $resPath) {
+      $rtxt = Get-Content -LiteralPath $resPath -Raw
+      $result = $rtxt | ConvertFrom-Json
+    }
     Fill-ProjectResult $script:lastProjectDir $result
     if ($result -and $result.status -eq "NEEDS_INPUT") {
-      $qs = @($result.questions)
+      $qs = @()
+      if ($result.questions) {
+        if ($result.questions -is [array]) { $qs = $result.questions }
+        else { $qs = @($result.questions) }
+      }
       $script:pipeQuestions = $qs
       if ($qs.Count -gt 0) {
         $txtQuestion.Text = "[" + [string]$qs[0].question_id + "] " + [string]$qs[0].question
@@ -472,11 +532,27 @@ function Run-Pipeline($answersFile) {
   }
 }
 
+$btnNavNew.Add_Click({
+  $txtPrompt.Text = ""
+  $script:pipePrompt = ""
+  Show-Mode $pnlDesign
+})
+$btnNavDesign.Add_Click({ Show-Mode $pnlDesign })
+$btnNavRef.Add_Click({ Show-Mode $pnlRef })
+$btnNavProj.Add_Click({ Refresh-Projects; Show-Mode $pnlProj })
+$btnNavSet.Add_Click({ Refresh-Tools; Show-Mode $pnlSet })
+
 $btnCreate.Add_Click({
   $lstResult.Items.Clear()
   $lstParts.Items.Clear(); $lstValidation.Items.Clear(); $lstWarnings.Items.Clear()
   $btnScad.Enabled = $false; $btnStl.Enabled = $false; $btnFolder.Enabled = $false
+  Set-Badge $badgeSpec "DesignSpec: ..." $C_BORDER
+  Set-Badge $badgeCAD "CAD: ..." $C_BORDER
+  Set-Badge $badgeSTL "STL: ..." $C_BORDER
+  Set-Badge $badgeVal "Validation: ..." $C_BORDER
   $script:pipeName = ("proje-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+  $script:pipePrompt = ""
+  $script:pipeRefSpec = ""
   $script:lastProjectDir = Join-Path $projectsDir $script:pipeName
   $script:pipeAnswers = @{}
   Set-Status "analiz ediliyor..."
@@ -484,7 +560,6 @@ $btnCreate.Add_Click({
 })
 
 $btnContinue.Add_Click({
-  # V1.1: ham cevap pipeline'a gider; parse + dogrulama engine tarafinda (uydurma yok).
   if ($txtAnswer.Text.Trim() -eq "") { Set-Status "once cevabi yaz"; return }
   if (@($script:pipeQuestions).Count -eq 0) { Set-Status "bekleyen soru yok"; return }
   $qid = [string]$script:pipeQuestions[0].question_id
@@ -501,33 +576,104 @@ $btnContinue.Add_Click({
 $btnScad.Add_Click({ if ($script:lastScad -ne "") { Start-Process -FilePath $script:lastScad } })
 $btnStl.Add_Click({ if ($script:lastStl -ne "") { Start-Process -FilePath $script:lastStl } })
 $btnFolder.Add_Click({ if ($script:lastProjectDir -ne "") { Start-Process -FilePath $script:lastProjectDir } })
-
-$lstProjects.Add_SelectedIndexChanged({
-  if ($lstProjects.SelectedItem -eq $null) { return }
-  $pd = Join-Path $projectsDir $lstProjects.SelectedItem.ToString()
-  $lines = New-Object System.Collections.Generic.List[string]
-  $ip = Join-Path $pd "input.md"; if (Test-Path -LiteralPath $ip) { $lines.Add("Prompt: " + ((Get-Content -LiteralPath $ip -Raw).Trim())) }
-  $sp = Join-Path $pd (Join-Path "cad" "model.scad"); if (Test-Path -LiteralPath $sp) { $lines.Add("SCAD: var") } else { $lines.Add("SCAD: yok") }
-  $tp = Join-Path $pd (Join-Path "output" "model.stl"); if (Test-Path -LiteralPath $tp) { $lines.Add("STL: var") } else { $lines.Add("STL: yok") }
-  $vp = Join-Path $pd (Join-Path "validation" "validation.json")
-  if (Test-Path -LiteralPath $vp) { $lines.Add("Validation: " + (Get-Content -LiteralPath $vp -Raw | ConvertFrom-Json).status) }
-  $rp = Join-Path $pd "README.md"; if (Test-Path -LiteralPath $rp) { $lines.Add("README: var") } else { $lines.Add("README: yok") }
-  $txtDetail.Lines = $lines.ToArray()
-  Show-ProjectPanels $pd
-})
-
-$btnToolsRefresh.Add_Click({ Refresh-Tools | Out-Null })
+$btnToolsRefresh.Add_Click({ Refresh-Tools })
 $btnToolOS.Add_Click({
   $dlg = New-Object System.Windows.Forms.OpenFileDialog
   $dlg.Filter = "OpenSCAD (openscad.com;openscad.exe)|openscad.com;openscad.exe|Tum dosyalar (*.*)|*.*"
   $dlg.Title = "OpenSCAD executable konumunu sec"
   if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
     Save-LocalTool "openscad" $dlg.FileName
-    Refresh-Tools | Out-Null
+    Refresh-Tools
     Set-Status "OpenSCAD konumu kaydedildi (settings.local.json)"
   }
 })
 
+$lstProjects.Add_SelectedIndexChanged({
+  if ($lstProjects.SelectedItem -eq $null) { return }
+  $pd = Join-Path $projectsDir $lstProjects.SelectedItem.ToString()
+  $lines = New-Object System.Collections.Generic.List[string]
+  $ip = Join-Path $pd "input.md"; if (Test-Path -LiteralPath $ip) { $lines.Add("Prompt: " + ((Get-Content -LiteralPath $ip -Raw).Trim())) }
+  $sp = Join-Path $pd "input.json"; if (Test-Path -LiteralPath $sp) { $lines.Add("DesignSpec: var") }
+  $sp2 = Join-Path $pd "spec.json"; if (Test-Path -LiteralPath $sp2) { $lines.Add("DesignSpec v2: var") }
+  $pj = Join-Path $pd "project.json"; if (Test-Path -LiteralPath $pj) { $lines.Add("project.json: var") }
+  $rp = Join-Path $pd "reference"; if (Test-Path -LiteralPath $rp) { $lines.Add("referans: var") }
+  $txtDetail.Lines = $lines.ToArray()
+  Show-ProjectPanels $pd
+})
+
+$btnRefBrowse.Add_Click({
+  $dlg = New-Object System.Windows.Forms.OpenFileDialog
+  $dlg.Filter = "3D model (STL/3MF/STEP)|*.stl;*.3mf;*.step;*.stp|Tum dosyalar (*.*)|*.*"
+  $dlg.Title = "Referans dosya sec (kopyalanir, degistirilmez)"
+  if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+    $script:refFile = $dlg.FileName
+    $script:refUrl = ""
+    $lblRefFile.Text = [System.IO.Path]::GetFileName($dlg.FileName)
+  }
+})
+$btnRefAnalyze.Add_Click({
+  $lstRefResult.Items.Clear()
+  $btnRefBuild.Enabled = $false
+  $script:refStage = Join-Path ([System.IO.Path]::GetTempPath()) ("refstage-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+  New-Item -ItemType Directory -Force -Path $script:refStage | Out-Null
+  try {
+    if ($txtRefUrl.Text.Trim() -ne "") {
+      $o = & $refScript -Url $txtRefUrl.Text.Trim() -ProjectDir $script:refStage 2>&1 | Out-String
+    } elseif ($script:refFile -and (Test-Path -LiteralPath $script:refFile)) {
+      $o = & $refScript -File $script:refFile -ProjectDir $script:refStage 2>&1 | Out-String
+    } else {
+      [void]$lstRefResult.Items.Add("URL yapistir veya Dosya Sec.")
+      return
+    }
+    foreach ($ln in ($o -split '\r\n|\r|\n')) {
+      $t = $ln.Trim()
+      if ($t -ne "") { [void]$lstRefResult.Items.Add($t) }
+    }
+    $rj = Join-Path $script:refStage (Join-Path "reference" "reference.json")
+    if (Test-Path -LiteralPath $rj) {
+      $script:refJson = $rj
+      $btnRefBuild.Enabled = $true
+    }
+  } catch {
+    [void]$lstRefResult.Items.Add("HATA: " + $_.Exception.Message)
+  }
+})
+$btnRefBuild.Add_Click({
+  if ($script:refJson -eq "" -or -not (Test-Path -LiteralPath $script:refJson)) { return }
+  $script:pipeName = ("ref-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+  $script:lastProjectDir = Join-Path $projectsDir $script:pipeName
+  New-Item -ItemType Directory -Force -Path $script:lastProjectDir | Out-Null
+  $specOut = Join-Path $script:lastProjectDir "spec.json"
+  try {
+    & $refSpecScript -ReferenceJson $script:refJson -ModPrompt $txtRefMod.Text -ProjectName $script:pipeName -OutSpec $specOut 2>&1 | Out-Null
+    $refDst = Join-Path $script:lastProjectDir "reference"
+    New-Item -ItemType Directory -Force -Path $refDst | Out-Null
+    Copy-Item -LiteralPath $script:refJson -Destination $refDst -Force
+    $rj = Get-Content -LiteralPath $script:refJson -Raw | ConvertFrom-Json
+    if ($rj.local_path -and (Test-Path -LiteralPath ([string]$rj.local_path))) {
+      Copy-Item -LiteralPath ([string]$rj.local_path) -Destination $refDst -Force
+    }
+    $script:pipeRefSpec = $specOut
+    $script:pipePrompt = ""
+    $script:pipeAnswers = @{}
+    Show-Mode $pnlDesign
+    Set-Status "referans spec olustu, pipeline calisiyor..."
+    Run-Pipeline ""
+  } catch {
+    Set-Status ("hata: " + $_.Exception.Message)
+  }
+})
+
+Show-Mode $pnlDesign
 Refresh-Projects
-Refresh-Tools | Out-Null
+Refresh-Tools
+if ($ValidateUI) {
+  $checks = New-Object System.Collections.Generic.List[string]
+  foreach ($c in @($txtPrompt, $btnCreate, $txtQuestion, $txtAnswer, $btnContinue, $lstResult, $txtRefUrl, $btnRefBrowse, $btnRefAnalyze, $lstRefResult, $txtRefMod, $btnRefBuild, $lstProjects, $txtDetail, $lstParts, $lstValidation, $lstWarnings, $txtHistory, $btnScad, $btnStl, $btnFolder, $lblToolOS, $btnToolsRefresh, $btnToolOS)) {
+    if ($null -eq $c) { $checks.Add("eksik-kontrol") }
+  }
+  $tabsOk = ($script:uiMode -eq "design")
+  if ($checks.Count -eq 0 -and $tabsOk) { Write-Output "UI-STARTUP: PASS"; exit 0 }
+  else { Write-Output "UI-STARTUP: FAIL"; exit 1 }
+}
 [void]$form.ShowDialog()

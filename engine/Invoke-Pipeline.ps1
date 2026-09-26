@@ -21,6 +21,7 @@ param(
   [string]$ProjectDir = "",
   [string]$AnswersJson = "",
   [string]$AnswersFile = "",
+  [string]$RefSpecFile = "",
   [switch]$NonInteractive
 )
 
@@ -56,7 +57,16 @@ function Write-PResult($obj, $code) {
   exit $code
 }
 
-# 1. AI/provider -> DesignSpec (spec v2 disinda cikti YOK)
+# 1. AI/provider -> DesignSpec (veya hazir referans spec)
+$providerName = $Provider
+if ($RefSpecFile -ne "") {
+  if (-not (Test-Path -LiteralPath $RefSpecFile)) { throw "Referans spec bulunamadi: $RefSpecFile" }
+  if ([System.IO.Path]::GetFullPath($RefSpecFile) -ne [System.IO.Path]::GetFullPath($specPath)) {
+    Copy-Item -LiteralPath $RefSpecFile -Destination $specPath -Force
+  }
+  $providerName = "REF"
+  Write-PLog $ProjectDir "parser.log" "REF-OK spec=spec.json (referans tabanli)"
+} else {
 try {
   $aiTxt = & (Join-Path $EngineDir "AIProvider.ps1") -Provider $Provider -Prompt $Prompt -ProjectName $ProjectName -OutSpec $specPath 2>&1 | Out-String
   $ai = $aiTxt | ConvertFrom-Json
@@ -67,8 +77,9 @@ try {
     questions = @(); parts = @(); gcode_available = $false
   }) 2
 }
-$providerName = $ai.provider
+$providerName = [string]$ai.provider
 Write-PLog $ProjectDir "parser.log" ("AI-OK provider=" + $providerName + " spec=spec.json")
+}
 
 # 2. Sorular (guncel spec) + cevaplar (varsa)
 function Save-Questions {
