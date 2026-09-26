@@ -58,13 +58,34 @@ class Launcher {
           "3D AI Designer", MessageBoxButtons.OK, MessageBoxIcon.Error);
         return 2;
       }
+      string pwsh = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell" + Path.DirectorySeparatorChar + "v1.0" + Path.DirectorySeparatorChar + "powershell.exe");
+      if (!File.Exists(pwsh)) { pwsh = "powershell.exe"; }
       ProcessStartInfo psi = new ProcessStartInfo();
-      psi.FileName = "powershell.exe";
+      psi.FileName = pwsh;
       psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -File \"" + app + "\"";
       psi.WorkingDirectory = dir;
       psi.UseShellExecute = false;
-      Process.Start(psi);
-      return 0;
+      psi.RedirectStandardOutput = true;
+      psi.RedirectStandardError = true;
+      psi.CreateNoWindow = true;
+      Process p = null;
+      try { p = Process.Start(psi); }
+      catch (Exception ex2) {
+        MessageBox.Show("PowerShell baslatilamadi:\n" + ex2.Message,
+          "3D AI Designer", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        return 3;
+      }
+      p.WaitForExit();
+      int code = p.ExitCode;
+      if (code != 0) {
+        string err = "";
+        try { err = p.StandardError.ReadToEnd(); } catch { }
+        if (err == null) { err = ""; }
+        if (err.Length > 2000) { err = err.Substring(err.Length - 2000); }
+        MessageBox.Show("Uygulama hata ile kapandi (kod " + code + "):\n" + err + "\n\nOpenSCAD bulunamazsa: Ayarlar > Araclar > Konum Sec.",
+          "3D AI Designer", MessageBoxButtons.OK, MessageBoxIcon.Error);
+      }
+      return code;
     } catch (Exception ex) {
       try {
         MessageBox.Show("Baslatma hatasi:\n" + ex.Message + "\n\nOpenSCAD bulunamazsa: Ayarlar > Araclar > Konum Sec.",
