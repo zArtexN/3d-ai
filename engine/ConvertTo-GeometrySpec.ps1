@@ -89,7 +89,7 @@ if ($low -match "i[c\u00e7]ini bo[s\u015f]alt" -or $low -match "i[c\u00e7]i bo[s
   }
 }
 
-$hm = [regex]::Match($low, 'delik\s*(\d+(?:[.,]\d+)?)')
+$hm = [regex]::Match($low, '(?:delik|deli[g\u011f][i\u0131uea])\s*(\d+(?:[.,]\d+)?)')
 $diaVal = $null
 if ($hm.Success) { $diaVal = (Get-Num $hm.Groups[1].Value) }
 else {
@@ -127,7 +127,35 @@ if ($null -ne $diaVal) {
   if ($mc.Success) {
     $hole.center_x_mm = (Get-Num $mc.Groups[1].Value); $hole.center_y_mm = (Get-Num $mc.Groups[2].Value); $hole.status = "ok"
   } else {
-    $questions.Add("Delik merkezi eksik (kritik olcu, uydurulamaz). Ornek: merkez 15,15 (referans koseden mm).")
+    $edgeDone = $false
+    $em = [regex]::Match($low, '(?:kenarlardan|kenardan|k[o\u00f6][s\u015f]eden|iki\s*kenardan)\s*(\d+(?:[.,]\d+)?)')
+    if ($em.Success) {
+      $ev = Get-Num $em.Groups[1].Value
+      $hole.center_x_mm = $ev; $hole.center_y_mm = $ev; $hole.status = "ok"
+      $edgeDone = $true
+    }
+    if (-not $edgeDone) {
+      $sm2 = [regex]::Match($low, 'sa[g\u011f]dan\s*(\d+(?:[.,]\d+)?)[^.;]*?alttan\s*(\d+(?:[.,]\d+)?)')
+      $sm3 = [regex]::Match($low, 'soldan\s*(\d+(?:[.,]\d+)?)[^.;]*?alttan\s*(\d+(?:[.,]\d+)?)')
+      $sm4 = [regex]::Match($low, 'sa[g\u011f]dan\s*(\d+(?:[.,]\d+)?)[^.;]*?[u\u00fc]stten\s*(\d+(?:[.,]\d+)?)')
+      $sm5 = [regex]::Match($low, 'soldan\s*(\d+(?:[.,]\d+)?)[^.;]*?[u\u00fc]stten\s*(\d+(?:[.,]\d+)?)')
+      if ($sm2.Success -and $comp.base.width_mm) {
+        $hole.center_x_mm = ([double]$comp.base.width_mm - (Get-Num $sm2.Groups[1].Value))
+        $hole.center_y_mm = (Get-Num $sm2.Groups[2].Value); $hole.status = "ok"; $edgeDone = $true
+      } elseif ($sm3.Success) {
+        $hole.center_x_mm = (Get-Num $sm3.Groups[1].Value)
+        $hole.center_y_mm = (Get-Num $sm3.Groups[2].Value); $hole.status = "ok"; $edgeDone = $true
+      } elseif ($sm4.Success -and $comp.base.width_mm -and $comp.base.depth_mm) {
+        $hole.center_x_mm = ([double]$comp.base.width_mm - (Get-Num $sm4.Groups[1].Value))
+        $hole.center_y_mm = ([double]$comp.base.depth_mm - (Get-Num $sm4.Groups[2].Value)); $hole.status = "ok"; $edgeDone = $true
+      } elseif ($sm5.Success -and $comp.base.depth_mm) {
+        $hole.center_x_mm = (Get-Num $sm5.Groups[1].Value)
+        $hole.center_y_mm = ([double]$comp.base.depth_mm - (Get-Num $sm5.Groups[2].Value)); $hole.status = "ok"; $edgeDone = $true
+      }
+    }
+    if (-not $edgeDone) {
+      $questions.Add("Delik merkezi eksik (kritik olcu, uydurulamaz). Ornek: merkez 15,15 (referans koseden mm).")
+    }
   }
   if ($htype -eq "blind") {
     $bd = Find-One $low 'derinlik\s*(\d+(?:[.,]\d+)?)'
