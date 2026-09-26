@@ -119,6 +119,21 @@ if ($null -ne $asm) {
 }
 
 $arr = @($qlist.ToArray() | Where-Object { $_ -ne $null })
+$parserByKind = @{
+  dims = "length"; lid_height = "length"; wall = "length"
+  hole_center = "center"; hole_dia = "length"; hole_depth = "length"; hole_extra = "length"
+  cutout = "length"; clearance = "length"; joint_clearance = "length"
+  hollow_top = "open_top"; rotate_axis = "axis"; mirror_axis = "axis"; edge_value = "length"
+}
+$i = 0
+foreach ($q in $arr) {
+  $i++
+  $q | Add-Member -NotePropertyName "displayId" -NotePropertyValue ("q" + $i) -Force
+  $pk = "length"
+  if ($parserByKind.ContainsKey([string]$q.kind)) { $pk = $parserByKind[[string]$q.kind] }
+  $q | Add-Member -NotePropertyName "parser" -NotePropertyValue $pk -Force
+  $q | Add-Member -NotePropertyName "required" -NotePropertyValue $true -Force
+}
 if ($AsJson) {
   if ($arr.Count -eq 0) { "[]" }
   else { $arr | ConvertTo-Json -Depth 4 }

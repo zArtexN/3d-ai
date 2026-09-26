@@ -44,12 +44,12 @@ $mod = Get-Content -LiteralPath $tmpMod -Raw | ConvertFrom-Json
 Remove-Item -LiteralPath $tmpMod -Force -ErrorAction SilentlyContinue
 $modBody = @($mod.components) | Where-Object { $_.id -eq "body" } | Select-Object -First 1
 if ($modBody) {
-  foreach ($h in @($modBody.holes)) { if ($h) { $base.holes = @(@($base.holes) + @($h)) } }
-  foreach ($t in @($modBody.cutouts)) { if ($t) { $base.cutouts = @(@($base.cutouts) + @($t)) } }
+  foreach ($h in @($modBody.holes)) { if ($h) { $base.holes = @($base.holes | Where-Object { $_ -ne $null }) + @($h) } }
+  foreach ($t in @($modBody.cutouts)) { if ($t) { $base.cutouts = @($base.cutouts | Where-Object { $_ -ne $null }) + @($t) } }
   if ($modBody.hollow) { $base.hollow = $modBody.hollow }
   if ($modBody.tolerance) { $base.tolerance = $modBody.tolerance }
-  foreach ($e in @($modBody.edge_notes)) { if ($e) { $base.edge_notes = @(@($base.edge_notes) + @($e)) } }
-  foreach ($tr in @($modBody.transforms)) { if ($tr) { $base.transforms = @(@($base.transforms) + @($tr)) } }
+  foreach ($e in @($modBody.edge_notes)) { if ($e) { $base.edge_notes = @($base.edge_notes | Where-Object { $_ -ne $null }) + @($e) } }
+  foreach ($tr in @($modBody.transforms)) { if ($tr) { $base.transforms = @($base.transforms | Where-Object { $_ -ne $null }) + @($tr) } }
   if ($modBody.pending_rotate) { $base.pending_rotate = $modBody.pending_rotate }
   if ($modBody.pending_mirror -eq $true) { $base.pending_mirror = $true }
   if ($modBody.base.width_mm -and $modBody.base.depth_mm -and $modBody.base.height_mm) {

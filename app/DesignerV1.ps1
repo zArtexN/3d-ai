@@ -10,7 +10,7 @@
   powershell -File app\DesignerV1.ps1
   powershell -File app\DesignerV1.ps1 -SelfTest
 #>
-param([switch]$SelfTest, [switch]$ValidateUI)
+param([switch]$SelfTest, [switch]$ValidateUI, [switch]$UITest)
 
 $ErrorActionPreference = "Stop"
 $AppDir = $PSScriptRoot
@@ -363,11 +363,45 @@ $script:pipePrompt = ""
 $script:pipeRefSpec = ""
 $script:pipeQuestions = @()
 $script:pipeAnswers = @{}
+$script:OriginalPrompt = ""
+$script:CurrentQ = $null
 $script:history = New-Object System.Collections.Generic.List[string]
 $script:refJson = ""
 $script:refStage = ""
 
 function Set-Status($t) { $lblStatus.Text = "Durum: $t"; $form.Refresh() }
+function Reset-QAState {
+  $script:OriginalPrompt = ""
+  $script:CurrentQ = $null
+  $script:pipeQuestions = @()
+  $script:pipeAnswers = @{}
+  $script:pipePrompt = ""
+  $script:pipeRefSpec = ""
+  $txtQuestion.Text = ""
+  $txtAnswer.Text = ""
+  $txtAnswer.Enabled = $false; $btnContinue.Enabled = $false
+}
+function Get-DisplayQuestion {
+  $list = @($script:pipeQuestions)
+  if ($list.Count -eq 0) { return $null }
+  $first = $list[0]
+  return [pscustomobject]@{
+    displayId = "q1"
+    stableId = [string]$first.question_id
+    type = [string]$first.kind
+    target = [string]$first.target
+    text = [string]$first.question
+  }
+}
+function Show-CurrentQuestion {
+  $dq = Get-DisplayQuestion
+  $script:CurrentQ = $dq
+  if ($null -eq $dq) { return $false }
+  $txtQuestion.Text = "[" + $dq.displayId + "] " + $dq.text + " (tur: " + $dq.type + ")"
+  Add-History ("SORU [" + $dq.displayId + "/" + $dq.stableId + "/" + $dq.type + "]: " + $dq.text)
+  $txtAnswer.Enabled = $true; $btnContinue.Enabled = $true
+  return $true
+}
 function Add-History($t) {
   $script:history.Add($t)
   $txtHistory.Lines = $script:history.ToArray()
@@ -492,8 +526,12 @@ function Fill-ProjectResult($pd, $result) {
 function Run-Pipeline($answersFile) {
   Set-Status "pipeline calisiyor (parser -> engine -> validation)..."
   try {
-    $prompt = $txtPrompt.Text
-    if ($script:pipePrompt -ne "") { $prompt = $script:pipePrompt }
+    $prompt = $script:OriginalPrompt
+    if ($script:pipeRefSpec -ne "" -and $prompt.Trim() -eq "") { $prompt = "referans proje" }
+    if ($prompt.Trim() -eq "") {
+      Set-Status "Tasarim prompt'u bulunamadi. Yeni proje baslatin."
+      return
+    }
     $pargs = @{ Prompt = $prompt; ProjectName = $script:pipeName; ProjectDir = $script:lastProjectDir }
     if ($script:pipeRefSpec -ne "") { $pargs.RefSpecFile = $script:pipeRefSpec }
     if ($answersFile -ne "") { $pargs.AnswersFile = $answersFile }
@@ -521,11 +559,7 @@ function Run-Pipeline($answersFile) {
         else { $qs = @($result.questions) }
       }
       $script:pipeQuestions = $qs
-      if ($qs.Count -gt 0) {
-        $txtQuestion.Text = "[" + [string]$qs[0].question_id + "] " + [string]$qs[0].question
-        Add-History ("SORU [" + [string]$qs[0].question_id + "]: " + [string]$qs[0].question)
-        $txtAnswer.Enabled = $true; $btnContinue.Enabled = $true
-      }
+      Show-CurrentQuestion | Out-Null
       Set-Status (Friendly-Status $result)
     } elseif ($result -and ($result.status -eq "PASS" -or $result.status -eq "WARNING")) {
       $txtQuestion.Text = ""
@@ -543,15 +577,24 @@ function Run-Pipeline($answersFile) {
 
 $btnNavNew.Add_Click({
   $txtPrompt.Text = ""
-  $script:pipePrompt = ""
+  Reset-QAState
+  $script:history.Clear()
+  $txtHistory.Clear()
+  $script:pipeName = ""
+  $script:lastProjectDir = ""
   Show-Mode $pnlDesign
+  Set-Status "hazir"
 })
 $btnNavDesign.Add_Click({ Show-Mode $pnlDesign })
 $btnNavRef.Add_Click({ Show-Mode $pnlRef })
 $btnNavProj.Add_Click({ Refresh-Projects; Show-Mode $pnlProj })
 $btnNavSet.Add_Click({ Refresh-Tools; Show-Mode $pnlSet })
 
-$btnCreate.Add_Click({
+function Invoke-CreateFlow {
+  if ($txtPrompt.Text.Trim() -eq "") {
+    Set-Status "Once prompt yaz. Ornek: 80x40x20 kutu, delik 25 merkez 15,15."
+    return "EMPTY_PROMPT"
+  }
   $lstResult.Items.Clear()
   $lstParts.Items.Clear(); $lstValidation.Items.Clear(); $lstWarnings.Items.Clear()
   $btnScad.Enabled = $false; $btnStl.Enabled = $false; $btnFolder.Enabled = $false
@@ -560,37 +603,31 @@ $btnCreate.Add_Click({
   Set-Badge $badgeSTL "STL: ..." $C_BORDER
   Set-Badge $badgeVal "Validation: ..." $C_BORDER
   $script:pipeName = ("proje-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
-  $script:pipePrompt = ""
-  $script:pipeRefSpec = ""
   $script:lastProjectDir = Join-Path $projectsDir $script:pipeName
-  $script:pipeAnswers = @{}
-  $script:pipeQuestions = @()
-  $txtQuestion.Text = ""
-  $txtAnswer.Text = ""
-  $txtAnswer.Enabled = $false; $btnContinue.Enabled = $false
+  Reset-QAState
+  $script:OriginalPrompt = $txtPrompt.Text
   Set-Status "analiz ediliyor..."
   Run-Pipeline ""
-})
-
-$btnContinue.Add_Click({
-  if ($txtAnswer.Text.Trim() -eq "") { Set-Status "once cevabi yaz"; return }
-  if (@($script:pipeQuestions).Count -eq 0) { Set-Status "bekleyen soru yok"; return }
-  $qid = [string]$script:pipeQuestions[0].question_id
-  $cur = @($script:pipeQuestions) | Where-Object { [string]$_.question_id -eq $qid } | Select-Object -First 1
-  if ($null -eq $cur) {
-    Set-Status "soru guncellendi; TASARLA ile yeniden baslat"
-    $txtAnswer.Enabled = $false; $btnContinue.Enabled = $false
-    return
-  }
-  Add-History ("CEVAP [" + $qid + "]: " + $txtAnswer.Text)
-  $script:pipeAnswers[$qid] = $txtAnswer.Text
+  return "STARTED"
+}
+function Invoke-ContinueFlow {
+  if ($txtAnswer.Text.Trim() -eq "") { Set-Status "once cevabi yaz"; return "EMPTY_ANSWER" }
+  $dq = Get-DisplayQuestion
+  if ($null -eq $dq) { Set-Status "bekleyen soru yok"; return "NO_QUESTION" }
+  Add-History ("CEVAP [" + $dq.displayId + "/" + $dq.stableId + "/" + $dq.type + "]: " + $txtAnswer.Text)
+  $script:pipeAnswers[$dq.stableId] = $txtAnswer.Text
   $ansFile = Join-Path ([System.IO.Path]::GetTempPath()) ($script:pipeName + "-cevap.json")
   $ansObj = [pscustomobject]@{}
   foreach ($k in $script:pipeAnswers.Keys) { $ansObj | Add-Member -NotePropertyName $k -NotePropertyValue ([string]$script:pipeAnswers[$k]) }
   $ansObj | ConvertTo-Json | Set-Content -LiteralPath $ansFile -Encoding UTF8
   $txtAnswer.Text = ""
   Run-Pipeline $ansFile
-})
+  return "SENT"
+}
+
+$btnCreate.Add_Click({ Invoke-CreateFlow | Out-Null })
+
+$btnContinue.Add_Click({ Invoke-ContinueFlow | Out-Null })
 
 $btnScad.Add_Click({ if ($script:lastScad -ne "") { Start-Process -FilePath $script:lastScad } })
 $btnStl.Add_Click({ if ($script:lastStl -ne "") { Start-Process -FilePath $script:lastStl } })
@@ -674,6 +711,7 @@ $btnRefBuild.Add_Click({
     }
     $script:pipeRefSpec = $specOut
     $script:pipePrompt = ""
+    $script:OriginalPrompt = $txtRefMod.Text
     $script:pipeAnswers = @{}
     Show-Mode $pnlDesign
     Set-Status "referans spec olustu, pipeline calisiyor..."
@@ -686,6 +724,38 @@ $btnRefBuild.Add_Click({
 Show-Mode $pnlDesign
 Refresh-Projects
 Refresh-Tools
+if ($UITest) {
+  $uit = New-Object System.Collections.Generic.List[string]
+  function Write-UIT($t) { $uit.Add($t); Write-Output $t }
+  $txtPrompt.Text = "50x50x10 kutu, icini bosalt duvar 2, delik 10"
+  $r0 = Invoke-CreateFlow
+  $dq0 = Get-DisplayQuestion
+  Write-UIT ("UI1 create=" + $r0 + " displayId=" + $dq0.displayId + " stableId=" + $dq0.stableId + " type=" + $dq0.type)
+  $u1ok = ($dq0.stableId -eq "body-hollow_top" -and $dq0.type -eq "hollow_top")
+  $txtAnswer.Text = "kapali"
+  $r1 = Invoke-ContinueFlow
+  $dq1 = Get-DisplayQuestion
+  Write-UIT ("UI2 continue=" + $r1 + " displayId=" + $dq1.displayId + " stableId=" + $dq1.stableId + " type=" + $dq1.type + " target=" + $dq1.target)
+  Write-UIT ("UI2 prompt-preserved=" + ($script:OriginalPrompt -eq "50x50x10 kutu, icini bosalt duvar 2, delik 10"))
+  Write-UIT ("UI2 raw-answer=kapali parser-selected=" + $dq1.type)
+  $u2ok = ($dq1.stableId -eq "body-hole-h1-center" -and $dq1.type -eq "hole_center" -and $script:OriginalPrompt -ne "")
+  $txtAnswer.Text = "15,15"
+  $r2 = Invoke-ContinueFlow
+  $stlHere = Test-Path -LiteralPath (Join-Path $script:lastProjectDir (Join-Path "output" "body.stl"))
+  Write-UIT ("UI3 continue=" + $r2 + " stl=" + $stlHere)
+  $u3ok = ($stlHere -and ($lblStatus.Text -match "tamamlandi"))
+  Reset-QAState
+  $script:history.Clear()
+  $u4ok = ($script:OriginalPrompt -eq "" -and (@($script:pipeQuestions).Count -eq 0) -and $script:CurrentQ -eq $null)
+  Write-UIT ("UI4 reset=" + $u4ok)
+  Remove-Item -LiteralPath $script:lastProjectDir -Recurse -Force -ErrorAction SilentlyContinue
+  for ($uir = 0; $uir -lt 5 -and (Test-Path -LiteralPath $script:lastProjectDir); $uir++) {
+    Start-Sleep -Milliseconds 800
+    Remove-Item -LiteralPath $script:lastProjectDir -Recurse -Force -ErrorAction SilentlyContinue
+  }
+  if ($u1ok -and $u2ok -and $u3ok -and $u4ok) { Write-UIT "UI-TEST: PASS"; exit 0 }
+  else { Write-UIT "UI-TEST: FAIL"; exit 1 }
+}
 if ($ValidateUI) {
   $checks = New-Object System.Collections.Generic.List[string]
   foreach ($c in @($txtPrompt, $btnCreate, $txtQuestion, $txtAnswer, $btnContinue, $lstResult, $txtRefUrl, $btnRefBrowse, $btnRefAnalyze, $lstRefResult, $txtRefMod, $btnRefBuild, $lstProjects, $txtDetail, $lstParts, $lstValidation, $lstWarnings, $txtHistory, $btnScad, $btnStl, $btnFolder, $lblToolOS, $btnToolsRefresh, $btnToolOS)) {

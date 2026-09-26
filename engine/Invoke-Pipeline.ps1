@@ -15,7 +15,7 @@
   powershell -File engine\Invoke-Pipeline.ps1 -Prompt "..." -ProjectName demo -AnswersJson '{"q1":"15,15"}'
 #>
 param(
-  [Parameter(Mandatory = $true)][string]$Prompt,
+  [string]$Prompt = "",
   [Parameter(Mandatory = $true)][string]$ProjectName,
   [string]$Provider = "MOCK",
   [string]$ProjectDir = "",
@@ -50,6 +50,16 @@ if ($ProjectDir -eq "") {
 New-Item -ItemType Directory -Force -Path $ProjectDir | Out-Null
 $specPath = Join-Path $ProjectDir "spec.json"
 $qPath = [System.IO.Path]::ChangeExtension($specPath, ".questions.json")
+
+if ($Prompt.Trim() -eq "" -and $RefSpecFile -eq "") {
+  $msg = "Tasarim prompt'u bulunamadi. Yeni proje baslatin."
+  [pscustomobject]@{
+    status = "BLOCKED"; stage = "prompt"; provider = $Provider; reason = $msg
+    questions = @(); parts = @(); gcode_available = $false
+  } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $ProjectDir "pipeline-result.json") -Encoding UTF8
+  Write-Output $msg
+  exit 2
+}
 
 function Write-PResult($obj, $code) {
   $obj | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $ProjectDir "pipeline-result.json") -Encoding UTF8

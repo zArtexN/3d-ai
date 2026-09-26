@@ -116,13 +116,18 @@ if ($PreflightOnly) {
 
 New-Item -ItemType Directory -Force -Path $Dist | Out-Null
 $exe = Join-Path $Dist "3D-AI-Designer.exe"
+if (Test-Path -LiteralPath $exe) { Remove-Item -LiteralPath $exe -Force }
 & $csc /nologo /target:winexe /r:System.Windows.Forms.dll /r:System.Drawing.dll /out:$exe $tmpCs 2>&1 | Out-Null
 Remove-Item -LiteralPath $tmpCs -Force -ErrorAction SilentlyContinue
-if (-not (Test-Path -LiteralPath $exe)) { throw "Derleme basarisiz." }
+if (-not (Test-Path -LiteralPath $exe)) { throw "Derleme basarisiz (exe olusmadi)." }
+$age = ((Get-Date) - (Get-Item -LiteralPath $exe).LastWriteTime).TotalMinutes
+if ($age -gt 2) { throw "Derleme basarisiz (exe guncellenmedi)." }
 foreach ($d in @("app", "engine", "scripts", "schemas", "templates", "printers", "materials", "projects", "docs")) {
   $src = Join-Path $Root $d
   if (Test-Path -LiteralPath $src) {
-    Copy-Item -LiteralPath $src -Destination (Join-Path $Dist $d) -Recurse -Force
+    $dst = Join-Path $Dist $d
+    if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Recurse -Force }
+    Copy-Item -LiteralPath $src -Destination $dst -Recurse -Force
   }
 }
 foreach ($f in @("settings.json", "README.md", "VERSION")) {
