@@ -35,7 +35,7 @@ function Count-Results($lines) {
 
 Write-Output "=== 1/8 SYNTAX ==="
 $synBad = 0; $synOk = 0
-$files = Get-ChildItem $Root -Include "*.ps1" -Recurse | Where-Object { $_.FullName -notmatch "node_modules" }
+$files = Get-ChildItem $Root -Include "*.ps1" -Recurse | Where-Object { ($_.FullName -notmatch "node_modules") -and ($_.FullName -notmatch "\\dist\\") }
 foreach ($f in $files) {
   $errs = $null
   [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$errs)
