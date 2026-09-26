@@ -23,8 +23,8 @@ $uspecObj = Get-Content -LiteralPath $SpecFile -Raw | ConvertFrom-Json
 
 function Get-NumU($s) { return [double]([string]$s -replace ',', '.') }
 function Parse-Pair($t) {
-  $m = [regex]::Match($t, '(-?\d+(?:[.,]\d+)?)\s*[,;xX]\s*(-?\d+(?:[.,]\d+)?)')
-  if (-not $m.Success) { throw "Cevap anlasilmadi. Iki sayi bekleniyor (ornek: 15,15). Girilen: $t" }
+  $m = [regex]::Match($t, '(-?\d+(?:[.,]\d+)?)\s*[,;xX\s]\s*(-?\d+(?:[.,]\d+)?)')
+  if (-not $m.Success) { throw "Cevap anlasilmadi. Iki sayi bekleniyor (ornek: 15,15 veya 15 15). Girilen: $t" }
   return @((Get-NumU $m.Groups[1].Value), (Get-NumU $m.Groups[2].Value))
 }
 function Parse-Triple($t) {
@@ -76,6 +76,8 @@ if ($kind -eq "dims") {
   if ($ax -eq "") { throw "Eksen anlasilmadi. X / Y / Z yaz. Girilen: $Answer" }
   $t = [pscustomobject]@{ op = "rotate"; x = 0; y = 0; z = 0 }
   $ang = [double]$comp.pending_rotate
+  $am = [regex]::Match($Answer, '(-?\d+(?:[.,]\d+)?)')
+  if ($am.Success -and [double]($am.Groups[1].Value -replace ',', '.') -ne 0) { $ang = [double]($am.Groups[1].Value -replace ',', '.') }
   if ($ax -eq "x") { $t.x = $ang } elseif ($ax -eq "y") { $t.y = $ang } else { $t.z = $ang }
   $comp.transforms = @(@($comp.transforms) + @($t))
   $comp.pending_rotate = $null
@@ -100,14 +102,17 @@ if ($kind -eq "dims") {
 } elseif ($kind -eq "hole_dia") {
   $hid = ($target -split '\.')[-2]
   $h = @($comp.holes) | Where-Object { [string]$_.id -eq $hid } | Select-Object -First 1
+  if ($null -eq $h) { throw "Delik bulunamadi: $hid" }
   $h.diameter_mm = Parse-One $Answer; $h.status = "ok"
 } elseif ($kind -eq "hole_depth") {
   $hid = ($target -split '\.')[-2]
   $h = @($comp.holes) | Where-Object { [string]$_.id -eq $hid } | Select-Object -First 1
+  if ($null -eq $h) { throw "Delik bulunamadi: $hid" }
   $h.depth_mm = Parse-One $Answer; $h.status = "ok"
 } elseif ($kind -eq "hole_extra") {
   $hid = ($target -split '\.')[-2]
   $h = @($comp.holes) | Where-Object { [string]$_.id -eq $hid } | Select-Object -First 1
+  if ($null -eq $h) { throw "Delik bulunamadi: $hid" }
   $p = Parse-Pair $Answer
   if ($h.hole_type -eq "countersink") { $h.cs_dia_mm = $p[0]; $h.cs_depth_mm = $p[1] }
   else { $h.cb_dia_mm = $p[0]; $h.cb_depth_mm = $p[1] }

@@ -21,8 +21,7 @@ $qspecObj = Get-Content -LiteralPath $SpecFile -Raw | ConvertFrom-Json
 
 $qlist = New-Object System.Collections.Generic.List[object]
 function Add-Q($comp, $field, $target, $kind, $q, $reason) {
-  $n = ($qlist.Count + 1)
-  $qid = ("q" + $n)
+  $qid = ([string]$target -replace '\.', '-')
   $qlist.Add([pscustomobject]@{
     question_id = $qid; component = $comp; field = $field; target = $target; kind = $kind
     question = $q; reason = $reason; answer = $null; source = $null; asked_at = $null

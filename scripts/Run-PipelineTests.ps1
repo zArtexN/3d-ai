@@ -125,7 +125,7 @@ $chk23 = {
   $ok = ([double]$cx -eq 20)
   return @{ ok = $ok; detail = $(if ($ok) { "merkez 20,20 islendi" } else { "merkez=$cx" }) }
 }
-Invoke-PipeCase "T23" "60x40x20 kutu, delik 12" @{ q1 = "20,20" } "PASS" $chk23
+Invoke-PipeCase "T23" "60x40x20 kutu, delik 12" @{ "body-hole-h1-center" = "20,20" } "PASS" $chk23
 
 # ---- T24/T25/T26: SCAD bolum + STL + kategoriler (T21 tekrarinda dogrula) ----
 $chk24 = {

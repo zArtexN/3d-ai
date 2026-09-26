@@ -96,11 +96,26 @@ if ($AnswersFile -ne "") {
 }
 if ($AnswersJson -ne "") {
   try { $ansMap = $AnswersJson | ConvertFrom-Json } catch { throw "Cevap JSON okunamadi: $_" }
+  $ansErrors = New-Object System.Collections.Generic.List[string]
   foreach ($prop in $ansMap.PSObject.Properties) {
-    & (Join-Path $EngineDir "Update-SpecAnswer.ps1") -SpecFile $specPath -QuestionId $prop.Name -Answer ([string]$prop.Value) 2>&1 | Out-Null
-    Write-PLog $ProjectDir "parser.log" ("CEVAP " + $prop.Name + "=" + [string]$prop.Value)
+    try {
+      & (Join-Path $EngineDir "Update-SpecAnswer.ps1") -SpecFile $specPath -QuestionId $prop.Name -Answer ([string]$prop.Value) 2>&1 | Out-Null
+      Write-PLog $ProjectDir "parser.log" ("CEVAP " + $prop.Name + "=" + [string]$prop.Value)
+    } catch {
+      $msg = [string]$_.Exception.Message
+      Write-PLog $ProjectDir "parser.log" ("CEVAP-HATA " + $prop.Name + ": " + $msg)
+      $ansErrors.Add($prop.Name + ": " + $msg)
+    }
   }
   $qsNow = Save-Questions
+  if ($ansErrors.Count -gt 0) {
+    Write-PResult ([pscustomobject]@{
+      status = "NEEDS_INPUT"; stage = "answers"; provider = $providerName
+      reason = "Bazi cevaplar anlasilmadi; ayni sorular ornek formata uygun cevapla tekrar soruluyor"
+      errors = @($ansErrors.ToArray()); questions = @($qsNow)
+      parts = @(); gcode_available = $false
+    }) 3
+  }
 }
 
 # 3. Spec gate: guvenilmez-cikti denetimi (sorular cevaplandiysa geometri de gecerli olmali)

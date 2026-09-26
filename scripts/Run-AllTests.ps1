@@ -33,7 +33,7 @@ function Count-Results($lines) {
   return @{ pass = $p; fail = $f }
 }
 
-Write-Output "=== 1/8 SYNTAX ==="
+Write-Output "=== 1/10 SYNTAX ==="
 $synBad = 0; $synOk = 0
 $files = Get-ChildItem $Root -Include "*.ps1" -Recurse | Where-Object { ($_.FullName -notmatch "node_modules") -and ($_.FullName -notmatch "\\dist\\") }
 foreach ($f in $files) {
@@ -46,47 +46,54 @@ $totalPass += $synOk; $totalFail += $synBad
 if ($synBad -gt 0) { $suitesOk = $false }
 Write-Output "syntax: $synOk OK, $synBad bozuk"
 
-Write-Output "=== 2/8 V1 TESTS ==="
+Write-Output "=== 2/10 V1 TESTS ==="
 $v1 = & (Join-Path $scriptsDir "Run-Tests.ps1") 2>&1
 $c = Count-Results $v1
 $totalPass += $c.pass; $totalFail += $c.fail
 if ($c.fail -gt 0) { $suitesOk = $false }
 Write-Output "V1: $($c.pass) PASS, $($c.fail) FAIL"
 
-Write-Output "=== 3/9 GEOMETRY TESTS ==="
+Write-Output "=== 3/10 GEOMETRY TESTS ==="
 $geo = & (Join-Path $scriptsDir "Run-GeometryTests.ps1") 2>&1
 $c = Count-Results $geo
 $totalPass += $c.pass; $totalFail += $c.fail
 if ($c.fail -gt 0) { $suitesOk = $false }
 Write-Output "geometry: $($c.pass) PASS, $($c.fail) FAIL"
 
-Write-Output "=== 4/9 PIPELINE TESTS ==="
+Write-Output "=== 4/10 PIPELINE TESTS ==="
 $pipe = & (Join-Path $scriptsDir "Run-PipelineTests.ps1") 2>&1
 $c = Count-Results $pipe
 $totalPass += $c.pass; $totalFail += $c.fail
 if ($c.fail -gt 0) { $suitesOk = $false }
 Write-Output "pipeline: $($c.pass) PASS, $($c.fail) FAIL"
 
-Write-Output "=== 5/9 PARSER TESTS ==="
+Write-Output "=== 5/10 PARSER TESTS ==="
 $par = & (Join-Path $scriptsDir "Run-ParserTests.ps1") 2>&1
 $c = Count-Results $par
 $totalPass += $c.pass; $totalFail += $c.fail
 if ($c.fail -gt 0) { $suitesOk = $false }
 Write-Output "parser: $($c.pass) PASS, $($c.fail) FAIL"
 
-Write-Output "=== 6/9 V13 TESTS ==="
+Write-Output "=== 6/10 V13 TESTS ==="
 $v13 = & (Join-Path $scriptsDir "Run-V13Tests.ps1") 2>&1
 $c = Count-Results $v13
 $totalPass += $c.pass; $totalFail += $c.fail
 if ($c.fail -gt 0) { $suitesOk = $false }
 Write-Output "v13: $($c.pass) PASS, $($c.fail) FAIL"
 
-Write-Output "=== 7/9 UI SELFTEST ==="
+Write-Output "=== 7/10 QA TESTS ==="
+$qa = & (Join-Path $scriptsDir "Test-QA.ps1") 2>&1
+$c = Count-Results $qa
+$totalPass += $c.pass; $totalFail += $c.fail
+if ($c.fail -gt 0) { $suitesOk = $false }
+Write-Output "qa: $($c.pass) PASS, $($c.fail) FAIL"
+
+Write-Output "=== 8/10 UI SELFTEST ==="
 $ui = & (Join-Path $Root (Join-Path "app" "DesignerV1.ps1")) -SelfTest 2>&1 | Out-String
 if ($ui -match "SELFTEST: PASS") { $totalPass++; Write-Output "UI selftest: PASS" }
 else { $totalFail++; $suitesOk = $false; Write-Output "UI selftest: FAIL" }
 
-Write-Output "=== 8/9 RESOLVER ==="
+Write-Output "=== 9/10 RESOLVER ==="
 foreach ($r in @("Resolve-OpenScad.ps1", "Resolve-FreeCad.ps1", "Resolve-OrcaSlicer.ps1")) {
   try {
     $v = & (Join-Path $scriptsDir $r) 2>&1 | Select-Object -Last 1
@@ -95,7 +102,7 @@ foreach ($r in @("Resolve-OpenScad.ps1", "Resolve-FreeCad.ps1", "Resolve-OrcaSli
   } catch { $totalFail++; $suitesOk = $false; Write-Output "[FAIL] $r" }
 }
 
-Write-Output "=== 9/9 PORTABLE ==="
+Write-Output "=== 10/10 PORTABLE ==="
 $port = & (Join-Path $scriptsDir "Run-PortableTest.ps1") 2>&1
 $c = Count-Results $port
 $totalPass += $c.pass; $totalFail += $c.fail
