@@ -147,7 +147,7 @@ if ($JsonOut -ne "") {
     file_bytes = $fileBytes
     bbox_min = @($minX, $minY, $minZ)
     bbox_max = @($maxX, $maxY, $maxZ)
-    bbox_size = @([math]::Round($maxX - $minX, 4), [math]::Round($maxY - $minY, 4), [math]::Round($maxZ - $minZ, 4))
+    bbox_size = @(([math]::Round($maxX - $minX, 4)), ([math]::Round($maxY - $minY, 4)), ([math]::Round($maxZ - $minZ, 4)))
     facet_count = $facets
     rim_bottom = $rimBottom
     rim_top = $rimTop

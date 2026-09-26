@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "3D AI Designer - DesignSpec v2 (geometry engine)",
+  "description": "V1 input.json korunur; v2 cok parcali/boolean/tolerans/montaj destekler. Promptta olmayan kritik deger UYDURULMAZ: null veya status=missing.",
+  "type": "object",
+  "required": ["project_name", "prompt", "components"],
+  "properties": {
+    "project_name": { "type": "string" },
+    "prompt": { "type": "string" },
+    "metadata": { "type": "object", "properties": { "spec_version": { "const": "2.0" } } },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "base"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": ["string", "null"] },
+          "base": {
+            "type": "object",
+            "required": ["shape"],
+            "properties": {
+              "shape": { "enum": ["box", "cylinder", "sphere", "cone", "tube", "rounded_box"] },
+              "width_mm": { "type": ["number", "null"] },
+              "depth_mm": { "type": ["number", "null"] },
+              "height_mm": { "type": ["number", "null"] },
+              "diameter_mm": { "type": ["number", "null"] },
+              "outer_diameter_mm": { "type": ["number", "null"] },
+              "inner_diameter_mm": { "type": ["number", "null"] },
+              "bottom_diameter_mm": { "type": ["number", "null"] },
+              "top_diameter_mm": { "type": ["number", "null"] },
+              "radius_mm": { "type": ["number", "null"] },
+              "axis": { "type": ["string", "null"], "enum": ["x", "y", "z", null] }
+            }
+          },
+          "hollow": { "type": ["object", "null"], "properties": { "wall_mm": { "type": ["number", "null"] }, "open_top": { "type": "boolean" } } },
+          "holes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "diameter_mm"],
+              "properties": {
+                "id": { "type": "string" },
+                "hole_type": { "enum": ["through", "blind", "countersink", "counterbore", "clearance"] },
+                "diameter_mm": { "type": "number" },
+                "center_x_mm": { "type": ["number", "null"] },
+                "center_y_mm": { "type": ["number", "null"] },
+                "axis": { "enum": ["x", "y", "z"] },
+                "depth_mm": { "type": ["number", "null"] },
+                "cs_dia_mm": { "type": ["number", "null"] },
+                "cs_depth_mm": { "type": ["number", "null"] },
+                "cb_dia_mm": { "type": ["number", "null"] },
+                "cb_depth_mm": { "type": ["number", "null"] },
+                "screw": { "type": ["string", "null"], "description": "Or: M4 (sadece metadata, standart DB yok)" },
+                "status": { "enum": ["ok", "missing"] }
+              }
+            }
+          },
+          "cutouts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "kind"],
+              "properties": {
+                "id": { "type": "string" },
+                "kind": { "enum": ["slot", "rect"] },
+                "face": { "enum": ["top", "front"] },
+                "pos_x_mm": { "type": ["number", "null"] },
+                "pos_y_mm": { "type": ["number", "null"] },
+                "width_mm": { "type": ["number", "null"] },
+                "length_mm": { "type": ["number", "null"] },
+                "depth_mm": { "type": ["number", "null"] },
+                "status": { "enum": ["ok", "missing"] }
+              }
+            }
+          },
+          "edge_notes": {
+            "type": "array",
+            "items": { "type": "object", "properties": { "kind": { "enum": ["fillet", "chamfer"] }, "value_mm": { "type": "number" }, "target": { "type": "string" } } }
+          },
+          "transforms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "op": { "enum": ["translate", "rotate", "mirror"] },
+                "x": { "type": "number" }, "y": { "type": "number" }, "z": { "type": "number" },
+                "axis": { "type": "string" }
+              }
+            }
+          },
+          "tolerance": { "type": ["object", "null"], "properties": { "type": { "type": "string" }, "clearance_mm": { "type": ["number", "null"] }, "fit_to": { "type": ["string", "null"] }, "status": { "enum": ["ok", "missing"] } } },
+          "expected_bbox": { "type": ["object", "null"], "properties": { "min": { "type": "array", "items": { "type": "number" } }, "max": { "type": "array", "items": { "type": "number" } } } }
+        }
+      }
+    },
+    "assembly": {
+      "type": ["object", "null"],
+      "properties": {
+        "parts": { "type": "array", "items": { "type": "string" } },
+        "joints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "type", "part_a", "part_b"],
+            "properties": {
+              "id": { "type": "string" },
+              "type": { "enum": ["press_fit", "sliding_fit", "screw", "snap_fit"] },
+              "part_a": { "type": "string" },
+              "part_b": { "type": "string" },
+              "clearance_mm": { "type": ["number", "null"] },
+              "screw": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "material": { "type": ["string", "null"] }
+  }
+}
