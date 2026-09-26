@@ -2,5 +2,6 @@
 .opencode/node_modules/
 node_modules/
 settings.local.json
+dist/
 *.bak
 *.tmp

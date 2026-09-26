@@ -1,8 +1,18 @@
-# 3D AI Designer V1.2 — 3D Printing AI Automation
+# 3D AI Designer V1.3 — 3D Printing AI Automation
 
-Dogal dil -> olculere sadik parametrik model -> STL/3MF -> dogrulama -> README.
+Dogal dil / referans model -> olculere sadik parametrik model -> STL/3MF -> dogrulama -> README.
 Slicing ayri asama; G-code SADECE OrcaSlicer profilleriyle (su an kapali).
-V1.2: uretim hatti (prompt -> soru/cevap -> spec v2 -> geometry engine -> STL -> validation).
+V1.3: dark UI, referanstan tasarla, EXE build, kenar-konum parser.
+
+## Calistirma
+- Uygulama: `powershell -File app\DesignerV1.ps1` (cift tik icin EXE build et)
+- EXE build: `powershell -ExecutionPolicy Bypass -File .\scripts\Build-Exe.ps1` -> `dist/3D-AI-Designer.exe`
+- EXE calistirma: `dist` klasorunu kopyala, exe'ye cift tikla.
+- OpenSCAD tanitma: Ayarlar > Araclar > OpenSCAD Konum Sec (settings.local.json, git disi).
+- Referans link: Referanstan Tasarla > URL yapistir > Analiz Et (http/https, limitli).
+- STL/3MF import: Dosya Sec (kopyalanir, orijinal degismez).
+- Soru sorarsa: kritik olcu eksiktir, uydurulmaz. Cevapla, DEVAM ET.
+- G-code neden yok: printer profili yok. CAD/STL/Validation hazir, G-CODE BLOCKED.
 
 ## Uretim hatti (V1.2)
 
@@ -30,6 +40,7 @@ Otomatik testler:
 - `powershell -File scripts\Run-GeometryTests.ps1` (V1.1: TEST 8-20)
 - `powershell -File scripts\Run-PipelineTests.ps1` (V1.2: T21-T44 + TA/B/C)
 - `powershell -File scripts\Run-ParserTests.ps1` (V1.2: P1-P16)
+- `powershell -File scripts\Run-V13Tests.ps1` (V1.3: P17-P20 + R21-R28)
 
 ## Klasorler
 - `.opencode/skills/3d-printing/` — zorunlu is akisi (Faz 3 kurallari)

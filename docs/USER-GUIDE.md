@@ -1,4 +1,15 @@
-# USER-GUIDE — 3D AI Designer V1.1 (basit dil)
+# USER-GUIDE — 3D AI Designer V1.3 (basit dil)
+
+## Hizli baslangic (EXE)
+1. `dist/3D-AI-Designer.exe` dosyasina cift tikla (yoksa: `scripts\Build-Exe.ps1` calistir).
+2. Ilk acilista ARACLAR denetlenir; OpenSCAD yoksa Ayarlar'dan bir kez goster.
+3. Tasarla sekmesinde yaz, TASARLA'ya bas; soru gelirse cevapla.
+
+## Referanstan tasarla
+1. Referanstan Tasarla sekmesi: URL yapistir veya Dosya Sec (STL/3MF/STEP).
+2. Referansi Analiz Et: olculer mesh'ten okunur; bilinmeyenler listelenir.
+3. Degisiklik komutunu yaz (orn: "aynisini yap ama deligi 8 mm olsun") ve Uret.
+4. Eksik olcu varsa SORULUR, uydurulmaz.
 
 ## Bu program ne yapiyor?
 Yazdigin olculerden 3 boyutlu yazdirilabilir model dosyasi (STL) hazirliyor.
