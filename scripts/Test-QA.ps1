@@ -178,6 +178,64 @@ try {
 } catch { Add-QAResult "T-QA-10" $false $_.Exception.Message }
 finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
 
+# T-QA-17: UI-esdeger adimli akis open_top -> center (task repro)
+$d = New-QADir "T-QA-17"
+try {
+  $pipe = Join-Path $Root (Join-Path "engine" "Invoke-Pipeline.ps1")
+  $pd = Join-Path $d "proj"
+  $pr = "50x50x10 kutu, icini bosalt duvar 2, delik 10"
+  $o1txt = & $pipe -Prompt $pr -ProjectName "qa17" -ProjectDir $pd 2>&1 | Out-String
+  $o1 = $o1txt | ConvertFrom-Json
+  $s1ok = ([string]$o1.status -eq "NEEDS_INPUT")
+  $a1 = [pscustomobject]@{}
+  $a1 | Add-Member -NotePropertyName "body-hollow_top" -NotePropertyValue "kapali"
+  $a1 | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $d "a1.json") -Encoding UTF8
+  $o2txt = & $pipe -Prompt $pr -ProjectName "qa17" -ProjectDir $pd -AnswersFile (Join-Path $d "a1.json") 2>&1 | Out-String
+  $o2 = $o2txt | ConvertFrom-Json
+  $q2ids = @(@($o2.questions) | ForEach-Object { [string]$_.question_id })
+  $s2ok = ([string]$o2.status -eq "NEEDS_INPUT" -and ($q2ids -contains "body-hole-h1-center") -and -not ($o2.errors -join " " -match "acik"))
+  $a2 = [pscustomobject]@{}
+  $a2 | Add-Member -NotePropertyName "body-hollow_top" -NotePropertyValue "kapali"
+  $a2 | Add-Member -NotePropertyName "body-hole-h1-center" -NotePropertyValue "15,15"
+  $a2 | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $d "a2.json") -Encoding UTF8
+  $o3txt = & $pipe -Prompt $pr -ProjectName "qa17" -ProjectDir $pd -AnswersFile (Join-Path $d "a2.json") 2>&1 | Out-String
+  $o3 = $o3txt | ConvertFrom-Json
+  $s3ok = ([string]$o3.status -eq "PASS")
+  $stlOk = Test-Path -LiteralPath (Join-Path $pd (Join-Path "output" "body.stl"))
+  $ok = ($s1ok -and $s2ok -and $s3ok -and $stlOk)
+  Add-QAResult "T-QA-17" $ok $(if ($ok) { "open_top->center->PASS, karisma yok" } else { "s1=$s1ok s2=$s2ok s3=$s3ok stl=$stlOk" })
+} catch { Add-QAResult "T-QA-17" $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+
+# T-QA-18: bayat qid -> NEEDS_INPUT, carpisma yok
+$d = New-QADir "T-QA-18"
+try {
+  $pipe = Join-Path $Root (Join-Path "engine" "Invoke-Pipeline.ps1")
+  $pd = Join-Path $d "proj"
+  $pr = "60x40x20 kutu, delik 12 merkez 20,20"
+  $ax = [pscustomobject]@{}
+  $ax | Add-Member -NotePropertyName "q1" -NotePropertyValue "kapali"
+  $ax | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $d "ax.json") -Encoding UTF8
+  $oTxt = & $pipe -Prompt $pr -ProjectName "qa18" -ProjectDir $pd -AnswersFile (Join-Path $d "ax.json") 2>&1 | Out-String
+  $o = $oTxt | ConvertFrom-Json
+  $errs = ""
+  if ($o.errors) { $errs = @($o.errors) -join " " }
+  $ok = ([string]$o.status -eq "NEEDS_INPUT" -and $errs -match "Soru bulunamadi")
+  Add-QAResult "T-QA-18" $ok $(if ($ok) { "bayat ID guvenli reddedildi" } else { "status=$([string]$o.status)" })
+} catch { Add-QAResult "T-QA-18" $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+
+# T-QA-19: "merkez 15 15" (bosluklu, onekli)
+$d = New-QADir "T-QA-19"
+try {
+  $sp = New-QASpec $d "T-QA-19" (New-QABody @((New-QAHole "h1" 10 $null $null "missing")) $null)
+  $r = Invoke-QAAnswer $sp $cenId "merkez 15 15"
+  $h = (Get-Content -LiteralPath $sp -Raw | ConvertFrom-Json).components[0].holes[0]
+  $ok = ($r.applied -and [double]$h.center_x_mm -eq 15 -and [double]$h.center_y_mm -eq 15)
+  Add-QAResult "T-QA-19" $ok $(if ($ok) { "kabul" } else { "hata: $($r.error)" })
+} catch { Add-QAResult "T-QA-19" $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+
 $passed = @($results | Where-Object { $_.result -eq "PASS" }).Count
 Write-Output "----------------------------------------"
 Write-Output "QA SONUC: $passed / $($results.Count) test gecti"

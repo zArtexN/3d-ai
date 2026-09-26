@@ -497,12 +497,21 @@ function Run-Pipeline($answersFile) {
     $pargs = @{ Prompt = $prompt; ProjectName = $script:pipeName; ProjectDir = $script:lastProjectDir }
     if ($script:pipeRefSpec -ne "") { $pargs.RefSpecFile = $script:pipeRefSpec }
     if ($answersFile -ne "") { $pargs.AnswersFile = $answersFile }
-    $o = & $pipelineScript @pargs 2>&1 | Out-String
     $resPath = Join-Path $script:lastProjectDir "pipeline-result.json"
+    if (Test-Path -LiteralPath $resPath) { Remove-Item -LiteralPath $resPath -Force }
+    $o = & $pipelineScript @pargs 2>&1 | Out-String
     $result = $null
     if (Test-Path -LiteralPath $resPath) {
       $rtxt = Get-Content -LiteralPath $resPath -Raw
       $result = $rtxt | ConvertFrom-Json
+    } else {
+      $txtQuestion.Text = ""
+      $txtAnswer.Enabled = $false; $btnContinue.Enabled = $false
+      $script:pipeQuestions = @()
+      Fill-ProjectResult $script:lastProjectDir $null
+      Set-Status "pipeline sonucu uretilemedi (calisma basarisiz); soru gosterilmiyor"
+      Refresh-Projects
+      return
     }
     Fill-ProjectResult $script:lastProjectDir $result
     if ($result -and $result.status -eq "NEEDS_INPUT") {
@@ -567,6 +576,12 @@ $btnContinue.Add_Click({
   if ($txtAnswer.Text.Trim() -eq "") { Set-Status "once cevabi yaz"; return }
   if (@($script:pipeQuestions).Count -eq 0) { Set-Status "bekleyen soru yok"; return }
   $qid = [string]$script:pipeQuestions[0].question_id
+  $cur = @($script:pipeQuestions) | Where-Object { [string]$_.question_id -eq $qid } | Select-Object -First 1
+  if ($null -eq $cur) {
+    Set-Status "soru guncellendi; TASARLA ile yeniden baslat"
+    $txtAnswer.Enabled = $false; $btnContinue.Enabled = $false
+    return
+  }
   Add-History ("CEVAP [" + $qid + "]: " + $txtAnswer.Text)
   $script:pipeAnswers[$qid] = $txtAnswer.Text
   $ansFile = Join-Path ([System.IO.Path]::GetTempPath()) ($script:pipeName + "-cevap.json")
