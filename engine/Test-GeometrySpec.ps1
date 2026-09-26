@@ -78,6 +78,7 @@ foreach ($c in @($gspecObj.components)) {
     elseif (2 * [double]$wl -ge $bw -or 2 * [double]$wl -ge $bd -or [double]$wl -ge $bh) {
       $errors.Add("($cid) hollow imkansiz: duvar $wl govdeye sigmyor (FAIL)")
     }
+    if ($null -eq $c.hollow.open_top) { $errors.Add("($cid) hollow.open_top belirtilmemis (ustu acik mi?) -> model olusturulamaz") }
     if ($null -ne $wl -and [double]$wl -gt 0 -and [double]$wl -lt $minWall) {
       $warnings.Add("WARNING: ($cid) duvar $wl mm < limit $minWall mm; deger korundu")
     }
@@ -131,8 +132,12 @@ foreach ($c in @($gspecObj.components)) {
 
   foreach ($e in @($c.edge_notes)) {
     if ($null -eq $e) { continue }
+    if ($null -eq $e.value_mm) { $errors.Add("($cid) $($e.kind) degeri eksik -> model olusturulamaz"); continue }
     $warnings.Add("WARNING: ($cid) $($e.kind) $($e.value_mm) mm ($($e.target)) uygulanmadi; ana model korundu")
   }
+
+  if ($null -ne $c.pending_rotate) { $errors.Add("($cid) rotate ekseni belirtilmemis -> model olusturulamaz") }
+  if ($c.pending_mirror -eq $true) { $errors.Add("($cid) ayna ekseni belirtilmemis -> model olusturulamaz") }
 
   $rotCount = 0
   foreach ($tr in @($c.transforms)) {
@@ -150,6 +155,9 @@ foreach ($c in @($gspecObj.components)) {
   else {
     if ($tol.status -eq "missing" -or ($null -eq $tol.clearance_mm -and $tol.type -ne "none")) {
       $errors.Add("($cid) tolerans kritik olcu eksik (status=missing) -> model olusturulamaz")
+    }
+    if ($null -ne $tol.clearance_mm -and [double]$tol.clearance_mm -lt 0) {
+      $errors.Add("($cid) tolerans gecersiz: clearance negatif olamaz")
     }
     if ($tol.fit_to -and ($compIds -notcontains [string]$tol.fit_to)) {
       $errors.Add("($cid) tolerans.fit_to bilinmeyen parcaya bakiyor: $($tol.fit_to)")
@@ -169,6 +177,9 @@ if ($null -ne $asm) {
     }
     if (([string]$j.type -eq "press_fit" -or [string]$j.type -eq "sliding_fit") -and $null -eq $j.clearance_mm) {
       $errors.Add("joint '$($j.id)': $($j.type) icin clearance_mm kritik olcu eksik -> BLOCKED")
+    }
+    if ($null -ne $j.clearance_mm -and [double]$j.clearance_mm -lt 0) {
+      $errors.Add("joint '$($j.id)': clearance negatif olamaz")
     }
     if ([string]$j.type -eq "screw" -and $null -eq $j.clearance_mm -and $null -eq $j.screw) {
       $errors.Add("joint '$($j.id)': screw icin clearance veya vida olcusu sart")

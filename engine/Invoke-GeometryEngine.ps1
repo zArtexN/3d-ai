@@ -69,7 +69,8 @@ function Write-GValidation($dir, $name, $obj) {
 # 1. Spec dogrulama
 $dvOut = & (Join-Path $EngineDir "Test-GeometrySpec.ps1") -SpecFile $SpecFile -Printer $printerPath -AsJson 2>&1
 $dvCode = $LASTEXITCODE
-$dv = $dvOut | Out-String | ConvertFrom-Json
+$dvTxt = $dvOut | Out-String
+$dv = $dvTxt | ConvertFrom-Json
 if ($dvCode -ne 0) {
   New-Item -ItemType Directory -Force -Path $ProjectDir | Out-Null
   Write-GValidation $ProjectDir "project" ([pscustomobject]@{
@@ -260,9 +261,31 @@ foreach ($c in @($gspecObj.components)) {
   }
 
   $stlInfo = Get-Item -LiteralPath (Join-Path $ProjectDir (Join-Path "output" ($cid + ".stl"))) -ErrorAction SilentlyContinue
+  $geoCat = "PASS"
+  if ($partStatus -eq "WARNING") { $geoCat = "WARNING" }
+  elseif ($partStatus -eq "FAIL" -or $partStatus -eq "FAILED_AFTER_RETRIES") { $geoCat = "FAIL" }
+  elseif ($partStatus -eq "BLOCKED") { $geoCat = "BLOCKED" }
+  $featCat = "PASS"
+  foreach ($hc in $holeChecks) { if ($hc.result -eq "FAIL") { $featCat = "FAIL" } }
+  if ($partStatus -eq "BLOCKED") { $featCat = "BLOCKED" }
+  $asmCat = "PASS"
+  if ($gspecObj.assembly) {
+    foreach ($j in @($gspecObj.assembly.joints)) {
+      if ($j -and ([string]$j.part_a -eq $cid -or [string]$j.part_b -eq $cid)) {
+        if ($null -eq $j.clearance_mm -and [string]$j.type -ne "snap_fit") { $asmCat = "WARNING" }
+      }
+    }
+  }
+  if ($partStatus -eq "BLOCKED") { $asmCat = "BLOCKED" }
+  $mfgCat = "PASS"
+  foreach ($wrn in @($projectWarnings.ToArray())) {
+    if ([string]$wrn -match [regex]::Escape("(" + $cid + ")")) { $mfgCat = "WARNING" }
+  }
+  if ($partStatus -eq "BLOCKED") { $mfgCat = "BLOCKED" }
   Write-GValidation $ProjectDir $cid ([pscustomobject]@{
     status = $partStatus
     part = $cid
+    categories = [pscustomobject]@{ geometry = $geoCat; feature = $featCat; assembly = $asmCat; manufacturability = $mfgCat }
     bbox_min = @($expMin); bbox_max = @($expMax)
     file_bytes = $(if ($stlInfo) { $stlInfo.Length } else { 0 })
     hole_checks = @($holeChecks)
@@ -281,8 +304,12 @@ foreach ($pr in $partResults) {
 }
 $now = (Get-Date).ToUniversalTime().ToString("o")
 $proj = [pscustomobject]@{
+  project_id = [string]$gspecObj.project_name
+  project_name = [string]$gspecObj.project_name
   created_at = $now; updated_at = $now; prompt = $gspecObj.prompt; status = $worstAll
+  designspec_version = "2.0"; engine_version = "V1.1"; pipeline_version = "V1.2"
   parts = @($partResults.ToArray()); validation_status = $worstAll; assembly = $gspecObj.assembly
+  gcode_available = $false; gcode_note = "NOT AVAILABLE - printer profile required"
 }
 $proj | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $ProjectDir "project.json") -Encoding UTF8
 

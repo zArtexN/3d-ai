@@ -115,6 +115,7 @@ Add-Type -AssemblyName System.Drawing
 
 $projectsDir = Get-ProjectsDir
 $engineScript = Join-Path $Root (Join-Path "engine" "Invoke-DesignEngine.ps1")
+$pipelineScript = Join-Path $Root (Join-Path "engine" "Invoke-Pipeline.ps1")
 $currentSpec = $null
 $currentSpecPath = ""
 $pendingQuestions = @()
@@ -130,6 +131,12 @@ $lblTitle.Font = New-Object System.Drawing.Font("Segoe UI", 16, [System.Drawing.
 $lblTitle.Location = New-Object System.Drawing.Point(20, 10)
 $lblTitle.Size = New-Object System.Drawing.Size(400, 35)
 $form.Controls.Add($lblTitle)
+
+$lblProvider = New-Object System.Windows.Forms.Label
+$lblProvider.Text = "AI Provider: MOCK (test - gercek AI degil)"
+$lblProvider.Location = New-Object System.Drawing.Point(480, 10)
+$lblProvider.Size = New-Object System.Drawing.Size(200, 35)
+$form.Controls.Add($lblProvider)
 
 $lblAsk = New-Object System.Windows.Forms.Label
 $lblAsk.Text = "Ne yapmak istiyorsun?"
@@ -283,6 +290,11 @@ $lstWarnings.Size = New-Object System.Drawing.Size(200, 60)
 $form.Controls.Add($lstWarnings)
 
 $script:lastProjectDir = ""
+$script:lastScad = ""
+$script:lastStl = ""
+$script:pipeName = ""
+$script:pipeQuestions = @()
+$script:pipeAnswers = @{}
 $script:history = New-Object System.Collections.Generic.List[string]
 
 function Add-History($t) {
@@ -307,6 +319,9 @@ function Show-ProjectPanels($pd) {
       try {
         $v = Get-Content -LiteralPath $f.FullName -Raw | ConvertFrom-Json
         [void]$lstValidation.Items.Add("$($f.BaseName): $($v.status)")
+        if ($v.categories) {
+          [void]$lstValidation.Items.Add("  GEO:$($v.categories.geometry) FEAT:$($v.categories.feature) ASM:$($v.categories.assembly) MFG:$($v.categories.manufacturability)")
+        }
         foreach ($w in @($v.warnings)) { [void]$lstWarnings.Items.Add([string]$w) }
         foreach ($w in @($v.design_warnings)) { [void]$lstWarnings.Items.Add([string]$w) }
       } catch { }
@@ -319,79 +334,107 @@ function Refresh-Projects {
   foreach ($p in (Get-ProjectList)) { [void]$lstProjects.Items.Add($p.name) }
 }
 function Set-Status($t) { $lblStatus.Text = "Durum: $t"; $form.Refresh() }
-function Run-Engine {
-  Set-Status "STL olusturuluyor + dogrulaniyor..."
+function Friendly-Status($result) {
+  if ($null -eq $result) { return "islem basarisiz (detay yok)" }
+  if ($result.status -eq "NEEDS_INPUT") { return "eksik kritik bilgi var - soruyu cevapla, model uretilmedi" }
+  if ($result.status -eq "BLOCKED") { return ("uretildi-BLOCKED: " + [string]$result.reason) }
+  if ($result.status -eq "FAILED") { return ("uretim basarisiz: " + [string]$result.reason) }
+  return [string]$result.status
+}
+function Fill-ProjectResult($pd, $result) {
+  $lstResult.Items.Clear()
+  $nm = Split-Path -Leaf $pd
+  [void]$lstResult.Items.Add("PROJECT: " + $nm)
+  $nParts = 0
+  if ($result -and $result.parts) { $nParts = @($result.parts).Count }
+  [void]$lstResult.Items.Add("DESIGN: " + $nParts + " parca")
+  $stls = @(Get-ChildItem -LiteralPath (Join-Path $pd "output") -Filter "*.stl" -ErrorAction SilentlyContinue)
+  if ($stls.Count -gt 0) {
+    [void]$lstResult.Items.Add("CAD: PASS")
+    [void]$lstResult.Items.Add("STL: PASS (" + $stls.Count + " dosya)")
+  } else {
+    [void]$lstResult.Items.Add("CAD: yok")
+    [void]$lstResult.Items.Add("STL: yok")
+  }
+  $vs = "yok"
+  if ($result) { $vs = [string]$result.status }
+  [void]$lstResult.Items.Add("VALIDATION: " + $vs)
+  [void]$lstResult.Items.Add("G-CODE: NOT AVAILABLE (printer profile required)")
+  Show-ProjectPanels $pd
+  $first = $stls | Select-Object -First 1
+  $script:lastScad = ""
+  $script:lastStl = ""
+  if ($first) {
+    $script:lastStl = $first.FullName
+    $maybeScad = Join-Path $pd (Join-Path "cad" ([System.IO.Path]::GetFileNameWithoutExtension($first.Name) + ".scad"))
+    if (Test-Path -LiteralPath $maybeScad) { $script:lastScad = $maybeScad }
+  }
+  $hasFiles = ($script:lastStl -ne "")
+  $btnScad.Enabled = ($script:lastScad -ne "")
+  $btnStl.Enabled = $hasFiles
+  $btnFolder.Enabled = $true
+}
+function Run-Pipeline($answersFile) {
+  Set-Status "pipeline calisiyor (parser -> engine -> validation)..."
   try {
-    $o = & $engineScript -Spec $currentSpecPath -ProjectDir (Join-Path $projectsDir $currentSpec.project_name) 2>&1 | Out-String
-    $code = $LASTEXITCODE
-    $script:lastProjectDir = Join-Path $projectsDir $currentSpec.project_name
-    Show-ProjectPanels $script:lastProjectDir
-    $lstResult.Items.Clear()
-    if ($code -eq 0) {
-      $lstResult.Items.Add("SCAD olusturuldu")
-      $lstResult.Items.Add("STL olusturuldu")
-      $lstResult.Items.Add("Olculer dogrulandi")
-      $btnScad.Enabled = $true; $btnStl.Enabled = $true; $btnFolder.Enabled = $true
+    $pargs = @("-Prompt", $txtPrompt.Text, "-ProjectName", $script:pipeName)
+    if ($answersFile -ne "") { $pargs += @("-AnswersFile", $answersFile) }
+    $o = & $pipelineScript @pargs 2>&1 | Out-String
+    $resPath = Join-Path $script:lastProjectDir "pipeline-result.json"
+    $result = $null
+    if (Test-Path -LiteralPath $resPath) { $result = Get-Content -LiteralPath $resPath -Raw | ConvertFrom-Json }
+    Fill-ProjectResult $script:lastProjectDir $result
+    if ($result -and $result.status -eq "NEEDS_INPUT") {
+      $qs = @($result.questions)
+      $script:pipeQuestions = $qs
+      if ($qs.Count -gt 0) {
+        $txtQuestion.Text = "[" + [string]$qs[0].question_id + "] " + [string]$qs[0].question
+        Add-History ("SORU [" + [string]$qs[0].question_id + "]: " + [string]$qs[0].question)
+        $txtAnswer.Enabled = $true; $btnContinue.Enabled = $true
+      }
+      Set-Status (Friendly-Status $result)
+    } elseif ($result -and ($result.status -eq "PASS" -or $result.status -eq "WARNING")) {
+      $txtQuestion.Text = ""
+      $txtAnswer.Enabled = $false; $btnContinue.Enabled = $false
       Set-Status "tamamlandi"
     } else {
-      $lstResult.Items.Add("Basarisiz (kod $code)")
-      foreach ($ln in ($o -split '\r\n|\r|\n' | Select-Object -First 6)) { $lstResult.Items.Add($ln.Trim()) }
-      Set-Status "hata - detaya bakin"
+      $txtAnswer.Enabled = $false; $btnContinue.Enabled = $false
+      Set-Status (Friendly-Status $result)
     }
     Refresh-Projects
   } catch {
     Set-Status ("hata: " + $_.Exception.Message)
   }
-  $btnContinue.Enabled = $false; $txtAnswer.Enabled = $false
 }
 
 $btnCreate.Add_Click({
   $lstResult.Items.Clear()
   $lstParts.Items.Clear(); $lstValidation.Items.Clear(); $lstWarnings.Items.Clear()
   $btnScad.Enabled = $false; $btnStl.Enabled = $false; $btnFolder.Enabled = $false
-  $name = ("proje-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
-  $script:currentSpec = Convert-PromptToSpec $txtPrompt.Text $name
-  $script:pendingQuestions = Get-MissingQuestions $script:currentSpec
-  $script:currentSpecPath = Join-Path ([System.IO.Path]::GetTempPath()) ($name + ".json")
-  $script:currentSpec | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $script:currentSpecPath -Encoding UTF8
+  $script:pipeName = ("proje-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+  $script:lastProjectDir = Join-Path $projectsDir $script:pipeName
+  $script:pipeAnswers = @{}
   Set-Status "analiz ediliyor..."
-  if ($script:pendingQuestions.Count -gt 0) {
-    $txtQuestion.Text = $script:pendingQuestions[0]
-    Add-History ("SORU: " + $script:pendingQuestions[0])
-    $txtAnswer.Enabled = $true; $btnContinue.Enabled = $true
-    Set-Status "soru soruldu - cevabi yazip DEVAM ET"
-  } else {
-    $txtQuestion.Text = ""
-    Run-Engine
-  }
+  Run-Pipeline ""
 })
 
 $btnContinue.Add_Click({
-  # V1: "merkez 15,15" kalibini cevaptan okur; okunamazsa durur (uydurmaz).
-  $m = [regex]::Match($txtAnswer.Text, '(\d+(?:[.,]\d+)?)\s*[,;]\s*(\d+(?:[.,]\d+)?)')
-  if (-not $m.Success) { Set-Status "cevap anlasilmadi (ornek: merkez 15,15)"; return }
-  Add-History ("CEVAP: " + $txtAnswer.Text)
-  foreach ($h in @($script:currentSpec.holes)) {
-    if ($h -and ($h.status -eq "missing" -or $null -eq $h.center_x_mm)) {
-      $h.center_x_mm = [double]($m.Groups[1].Value -replace ',', '.')
-      $h.center_y_mm = [double]($m.Groups[2].Value -replace ',', '.')
-      $h.status = "ok"
-      break
-    }
-  }
-  $script:currentSpec | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $script:currentSpecPath -Encoding UTF8
-  $script:pendingQuestions = Get-MissingQuestions $script:currentSpec
-  if ($script:pendingQuestions.Count -gt 0) {
-    $txtQuestion.Text = $script:pendingQuestions[0]
-    Set-Status "bir soru daha var"
-  } else {
-    $txtQuestion.Text = ""
-    Run-Engine
-  }
+  # V1.1: ham cevap pipeline'a gider; parse + dogrulama engine tarafinda (uydurma yok).
+  if ($txtAnswer.Text.Trim() -eq "") { Set-Status "once cevabi yaz"; return }
+  if (@($script:pipeQuestions).Count -eq 0) { Set-Status "bekleyen soru yok"; return }
+  $qid = [string]$script:pipeQuestions[0].question_id
+  Add-History ("CEVAP [" + $qid + "]: " + $txtAnswer.Text)
+  $script:pipeAnswers[$qid] = $txtAnswer.Text
+  $ansFile = Join-Path ([System.IO.Path]::GetTempPath()) ($script:pipeName + "-cevap.json")
+  $ansObj = [pscustomobject]@{}
+  foreach ($k in $script:pipeAnswers.Keys) { $ansObj | Add-Member -NotePropertyName $k -NotePropertyValue ([string]$script:pipeAnswers[$k]) }
+  $ansObj | ConvertTo-Json | Set-Content -LiteralPath $ansFile -Encoding UTF8
+  $txtAnswer.Text = ""
+  Run-Pipeline $ansFile
 })
 
-$btnScad.Add_Click({ if ($script:lastProjectDir -ne "") { Start-Process -FilePath (Join-Path $script:lastProjectDir (Join-Path "cad" "model.scad")) } })
-$btnStl.Add_Click({ if ($script:lastProjectDir -ne "") { Start-Process -FilePath (Join-Path $script:lastProjectDir (Join-Path "output" "model.stl")) } })
+$btnScad.Add_Click({ if ($script:lastScad -ne "") { Start-Process -FilePath $script:lastScad } })
+$btnStl.Add_Click({ if ($script:lastStl -ne "") { Start-Process -FilePath $script:lastStl } })
 $btnFolder.Add_Click({ if ($script:lastProjectDir -ne "") { Start-Process -FilePath $script:lastProjectDir } })
 
 $lstProjects.Add_SelectedIndexChanged({

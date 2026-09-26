@@ -69,7 +69,8 @@ if (-not [System.IO.Path]::IsPathRooted($printerPath)) { $printerPath = Join-Pat
 # 1. Design validation
 $dvOut = & (Join-Path $EngineDir "Test-DesignSpec.ps1") -Spec $Spec -Printer $printerPath -AsJson 2>&1
 $dvCode = $LASTEXITCODE
-$dv = $dvOut | Out-String | ConvertFrom-Json
+$dvTxt = $dvOut | Out-String
+$dv = $dvTxt | ConvertFrom-Json
 if ($dvCode -ne 0) {
   New-Item -ItemType Directory -Force -Path $ProjectDir | Out-Null
   Write-ValidationJson $ProjectDir ([pscustomobject]@{

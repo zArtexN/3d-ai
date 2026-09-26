@@ -34,7 +34,7 @@
               "axis": { "type": ["string", "null"], "enum": ["x", "y", "z", null] }
             }
           },
-          "hollow": { "type": ["object", "null"], "properties": { "wall_mm": { "type": ["number", "null"] }, "open_top": { "type": "boolean" } } },
+          "hollow": { "type": ["object", "null"], "properties": { "wall_mm": { "type": ["number", "null"] }, "open_top": { "type": ["boolean", "null"] } } },
           "holes": {
             "type": "array",
             "items": {
@@ -77,7 +77,7 @@
           },
           "edge_notes": {
             "type": "array",
-            "items": { "type": "object", "properties": { "kind": { "enum": ["fillet", "chamfer"] }, "value_mm": { "type": "number" }, "target": { "type": "string" } } }
+            "items": { "type": "object", "properties": { "kind": { "enum": ["fillet", "chamfer"] }, "value_mm": { "type": ["number", "null"] }, "target": { "type": "string" } } }
           },
           "transforms": {
             "type": "array",
@@ -91,6 +91,8 @@
             }
           },
           "tolerance": { "type": ["object", "null"], "properties": { "type": { "type": "string" }, "clearance_mm": { "type": ["number", "null"] }, "fit_to": { "type": ["string", "null"] }, "status": { "enum": ["ok", "missing"] } } },
+          "pending_rotate": { "type": ["number", "null"], "description": "Ekseni sorulan rotate acisi (soru cevaplaninca transforms'a tasinir)" },
+          "pending_mirror": { "type": "boolean", "description": "Ekseni sorulan ayna isareti" },
           "expected_bbox": { "type": ["object", "null"], "properties": { "min": { "type": "array", "items": { "type": "number" } }, "max": { "type": "array", "items": { "type": "number" } } } }
         }
       }

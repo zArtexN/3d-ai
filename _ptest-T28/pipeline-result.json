@@ -1,0 +1,13 @@
+﻿{
+    "status":  "BLOCKED",
+    "stage":  "ai",
+    "provider":  "-ProjectName",
+    "reason":  "AI provider bagli degil: -ProjectName (hazir arayuz; su an yalnizca MOCK calisir). Destek plani: OPENAI/CLAUDE/LOCAL/OLLAMA.",
+    "questions":  [
+
+                  ],
+    "parts":  [
+
+              ],
+    "gcode_available":  false
+}

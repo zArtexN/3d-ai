@@ -40,7 +40,7 @@ function Find-One($t, $pat) {
   return $null
 }
 
-$low = $Prompt.ToLowerInvariant()
+$low = $Prompt.ToLowerInvariant() -replace "\u0307", ""
 $questions = New-Object System.Collections.Generic.List[string]
 
 $components = New-Object System.Collections.Generic.List[object]
@@ -76,21 +76,50 @@ if (-not $handled) {
 }
 
 if ($low -match "i[c\u00e7]ini bo[s\u015f]alt" -or $low -match "i[c\u00e7]i bo[s\u015f]") {
-  $wl = Find-One $low 'duvar\s*(\d+(?:[.,]\d+)?)'
+  $wl = Find-One $low 'duvar(?:lar)?[i\u0131]?(?:\s*kal[i\u0131]nl[i\u0131][g\u011f][i\u0131])?\s*(\d+(?:[.,]\d+)?)'
   if ($null -eq $wl) { $questions.Add("Duvar kalinligi nedir? (ornek: duvar 2.5). Uydurulamaz.") }
-  $openTop = ($low -match "[u\u00fc]st[u\u00fc]\s*a[c\u00e7][i\u0131]k")
-  $comp.hollow = [pscustomobject]@{ wall_mm = $wl; open_top = [bool]$openTop }
+  $openTop = $null
+  if ($low -match "[u\u00fc]st[u\u00fc]\s*a[c\u00e7][i\u0131]k") { $openTop = $true }
+  elseif ($low -match "kapal[i\u0131]") { $openTop = $false }
+  $comp.hollow = [pscustomobject]@{ wall_mm = $wl; open_top = $openTop }
+} else {
+  $wlOnly = Find-One $low 'duvar(?:lar)?[i\u0131]?(?:\s*kal[i\u0131]nl[i\u0131][g\u011f][i\u0131])?\s*(\d+(?:[.,]\d+)?)'
+  if ($null -ne $wlOnly) {
+    $comp.hollow = [pscustomobject]@{ wall_mm = $wlOnly; open_top = $null }
+  }
 }
 
 $hm = [regex]::Match($low, 'delik\s*(\d+(?:[.,]\d+)?)')
-if ($hm.Success) {
+$diaVal = $null
+if ($hm.Success) { $diaVal = (Get-Num $hm.Groups[1].Value) }
+else {
+  $hm2 = [regex]::Match($low, 'delikleri?\s*(\d+(?:[.,]\d+)?)')
+  if ($hm2.Success) { $diaVal = (Get-Num $hm2.Groups[1].Value) }
+  else {
+    $hm3 = [regex]::Match($low, '(\d+(?:[.,]\d+)?)\s*mm\s*[c\u00e7]ap[i\u0131]nda\s*delik')
+    if ($hm3.Success) { $diaVal = (Get-Num $hm3.Groups[1].Value) }
+  }
+}
+$typeKw = $null
+if ($low -match "k[o\u00f6]r") { $typeKw = "blind" }
+elseif ($low -match "hav[s\u015f]a") { $typeKw = "countersink" }
+elseif ($low -match "g[o\u00f6]mme") { $typeKw = "counterbore" }
+$mentionsHole = ($low -match "delik") -or ($low -match "kenardan")
+if ($null -eq $diaVal -and ($null -ne $typeKw -or $mentionsHole)) {
+  $comp.holes = @([pscustomobject]@{
+    id = "h1"; hole_type = $(if ($null -ne $typeKw) { $typeKw } else { "through" }); diameter_mm = $null
+    center_x_mm = $null; center_y_mm = $null; axis = "z"
+    depth_mm = $null; cs_dia_mm = $null; cs_depth_mm = $null; cb_dia_mm = $null; cb_depth_mm = $null
+    screw = $null; status = "missing"
+  })
+  $questions.Add("Delik capi ve merkezi nedir? Ornek: delik 20 merkez 15,15.")
+}
+if ($null -ne $diaVal) {
   $htype = "through"
-  if ($low -match "k[o\u00f6]r") { $htype = "blind" }
-  elseif ($low -match "hav[s\u015f]a") { $htype = "countersink" }
-  elseif ($low -match "g[o\u00f6]mme") { $htype = "counterbore" }
+  if ($null -ne $typeKw) { $htype = $typeKw }
   $mc = [regex]::Match($low, 'merkez\s*(\d+(?:[.,]\d+)?)\s*[,;]\s*(\d+(?:[.,]\d+)?)')
   $hole = [pscustomobject]@{
-    id = "h1"; hole_type = $htype; diameter_mm = (Get-Num $hm.Groups[1].Value)
+    id = "h1"; hole_type = $htype; diameter_mm = $diaVal
     center_x_mm = $null; center_y_mm = $null; axis = "z"
     depth_mm = $null; cs_dia_mm = $null; cs_depth_mm = $null; cb_dia_mm = $null; cb_depth_mm = $null
     screw = $null; status = "missing"
@@ -126,8 +155,10 @@ if ($low -match "slot" -or $low -match "kanal" -or $low -match "kesik" -or $low 
 
 $rm = [regex]::Match($low, 'yuvarlat?\s*(\d+(?:[.,]\d+)?)')
 if ($rm.Success) { $comp.edge_notes = @([pscustomobject]@{ kind = "fillet"; value_mm = (Get-Num $rm.Groups[1].Value); target = "kenarlar" }) }
+elseif ($low -match "yuvarla") { $comp.edge_notes = @([pscustomobject]@{ kind = "fillet"; value_mm = $null; target = "kenarlar" }) }
 $cm = [regex]::Match($low, 'pah(?:\s*k[i\u0131]r)?\s*(\d+(?:[.,]\d+)?)')
 if ($cm.Success) { $comp.edge_notes = @($comp.edge_notes) + @([pscustomobject]@{ kind = "chamfer"; value_mm = (Get-Num $cm.Groups[1].Value); target = "kenarlar" }) }
+elseif ($low -match "pah") { $comp.edge_notes = @($comp.edge_notes) + @([pscustomobject]@{ kind = "chamfer"; value_mm = $null; target = "kenarlar" }) }
 
 $tm = [regex]::Match($low, '([zZ])\s*ekseninde\s*(\d+)\s*derece\s*d[o\u00f6]nd[u\u00fc]r')
 if ($tm.Success) {
@@ -139,10 +170,14 @@ if ($tm.Success) {
     $t = [pscustomobject]@{ op = "rotate"; x = 0; y = 0; z = 0 }
     if ($ax -eq "x") { $t.x = $ang } elseif ($ax -eq "y") { $t.y = $ang } else { $t.z = $ang }
     $comp.transforms = @($t)
+  } elseif ($low -match "d[o\u00f6]nd[u\u00fc]r") {
+    $am = [regex]::Match($low, '(\d+)\s*derece')
+    if ($am.Success) { $comp | Add-Member -NotePropertyName "pending_rotate" -NotePropertyValue ([double]$am.Groups[1].Value) -Force }
   }
 }
 $mm = [regex]::Match($low, 'ayna\s*([xXyYzZ])')
 if ($mm.Success) { $comp.transforms = @($comp.transforms) + @([pscustomobject]@{ op = "mirror"; axis = $mm.Groups[1].Value.ToLowerInvariant() }) }
+elseif ($low -match "simetri") { $comp | Add-Member -NotePropertyName "pending_mirror" -NotePropertyValue $true -Force }
 
 $tm3 = [regex]::Match($low, '(\d+(?:[.,]\d+)?)\s*mm\s*bo[s\u015f]luk')
 if ($tm3.Success) {
