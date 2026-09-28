@@ -15,7 +15,8 @@ param(
   [Parameter(Mandatory = $true)][string]$SpecFile,
   [string]$ProjectDir = "",
   [string]$Printer = "",
-  [int]$MaxRetries = 3
+  [int]$MaxRetries = 3,
+  [double]$MeasurementTolerance = 0.1
 )
 
 $ErrorActionPreference = "Stop"
@@ -122,6 +123,7 @@ foreach ($c in @($gspecObj.components)) {
   $lastVerify = ""
   $expMin = @(0, 0, 0); $expMax = @(0, 0, 0)
   $holeChecks = @()
+  $cutoutChecks = @()
   try {
     # --- taban sekli ---
     $b = $c.base
@@ -299,6 +301,13 @@ foreach ($c in @($gspecObj.components)) {
     # --- SCAD yaz (bolumlu, BOM-suz) ---
     $noteLines = New-Object System.Collections.Generic.List[string]
     if ($gspecObj.assembly) { $noteLines.Add("assembly metadata: validation disi (simulasyon yok)") }
+    $specVerNote = "?"
+    if ($null -ne $gspecObj.metadata -and $null -ne $gspecObj.metadata.spec_version) { $specVerNote = [string]$gspecObj.metadata.spec_version }
+    $featIds = @()
+    foreach ($fh in @($c.holes)) { if ($fh -and $fh.id) { $featIds += [string]$fh.id } }
+    foreach ($ft in @($c.cutouts)) { if ($ft -and $ft.id) { $featIds += [string]$ft.id } }
+    if ($null -ne $c.divider_pattern) { $featIds += ("dividers:" + [string]$c.divider_pattern.count) }
+    $noteLines.Add(("spec: v" + $specVerNote + "; features: " + ($featIds -join ",")))
     $doc = Build-ScadDocument ($gspecObj.project_name + " / " + $cid) $paramLines.ToArray() @($geo.scad) $noteLines.ToArray()
     $cadDir = Join-Path $ProjectDir "cad"
     New-Item -ItemType Directory -Force -Path $cadDir | Out-Null
@@ -325,7 +334,8 @@ foreach ($c in @($gspecObj.components)) {
       catch { $expOk = $false; $lastVerify = $_.Exception.Message }
       if (-not $expOk) { $partStatus = "FAIL"; continue }
       $stl = Join-Path $outDir ($cid + ".stl")
-      $baseArgs = @{ Stl = $stl; ExpMinX = [double]$expMin[0]; ExpMinY = [double]$expMin[1]; ExpMinZ = [double]$expMin[2]; ExpMaxX = [double]$expMax[0]; ExpMaxY = [double]$expMax[1]; ExpMaxZ = [double]$expMax[2] }
+      # Olcum toleransi merkezi: imalat toleransi (clearance) ile karistirilmaz.
+      $baseArgs = @{ Stl = $stl; Tolerance = $MeasurementTolerance; ExpMinX = [double]$expMin[0]; ExpMinY = [double]$expMin[1]; ExpMinZ = [double]$expMin[2]; ExpMaxX = [double]$expMax[0]; ExpMaxY = [double]$expMax[1]; ExpMaxZ = [double]$expMax[2] }
       $throughHoles = @(@($c.holes) | Where-Object { $_ -and (-not $_.hole_type -or [string]$_.hole_type -eq "through" -or [string]$_.hole_type -eq "clearance") })
       $blindHoles = @(@($c.holes) | Where-Object { $_ -and [string]$_.hole_type -eq "blind" })
       # Cikis duzlemi: hollow+acik govdede delik tabanda biter (floor);
@@ -349,10 +359,23 @@ foreach ($c in @($gspecObj.components)) {
           $hargs.HoleCY = [double]$h.center_y_mm
           $hargs.HoleDiameter = [double]$h.diameter_mm
           $hargs.HoleZTop = $exitZ
+          $vjFile = Join-Path ([System.IO.Path]::GetTempPath()) ("vrfy-" + $cid + "-" + [string]$h.id + ".json")
+          $hargs.JsonOut = $vjFile
           $res = Run-GVerify $hargs
           $txt = $res.text
           $rr2 = "PASS"; if ($res.code -ne 0) { $rr2 = "FAIL" } elseif ($txt -match "WARNING") { $rr2 = "WARNING" }
-          $holeChecks += [pscustomobject]@{ id = [string]$h.id; result = $rr2 }
+          $mDia = $null; $mCen = $null
+          try {
+            if (Test-Path -LiteralPath $vjFile) {
+              $vj = Get-Content -LiteralPath $vjFile -Raw | ConvertFrom-Json
+              if ($null -ne $vj.hole_measured_diameter) { $mDia = [double]$vj.hole_measured_diameter }
+              if ($null -ne $vj.hole_measured_center -and @($vj.hole_measured_center).Count -ge 2 -and $null -ne $vj.hole_measured_center[0]) {
+                $mCen = @([double]$vj.hole_measured_center[0], [double]$vj.hole_measured_center[1])
+              }
+            }
+          } catch { }
+          Remove-Item -LiteralPath $vjFile -Force -ErrorAction SilentlyContinue
+          $holeChecks += [pscustomobject]@{ id = [string]$h.id; result = $rr2; expected_diameter = [double]$h.diameter_mm; measured_diameter = $mDia; expected_center = @([double]$h.center_x_mm, [double]$h.center_y_mm); measured_center = $mCen }
           if ($rr2 -eq "FAIL") { $worst = "FAIL" } elseif ($rr2 -eq "WARNING" -and $worst -eq "PASS") { $worst = "WARNING" }
           $lastVerify = $txt
         }
@@ -373,10 +396,66 @@ foreach ($c in @($gspecObj.components)) {
           $lastVerify = $txt
         }
       }
+      # Kesik aciklik olcumu (rect; slot UNVERIFIED). Delikten bagimsiz calisir.
+      foreach ($t in @($c.cutouts)) {
+          if ($null -eq $t) { continue }
+          $tid = [string]$t.id
+          if ([string]$t.kind -eq "slot") {
+            $cutoutChecks += [pscustomobject]@{ id = $tid; result = "UNVERIFIED"; reason = "slot olcumu desteklenmiyor" }
+            continue
+          }
+          $cfBase = ([string]$t.face -replace '_short_edge$','' -replace '_long_edge$','')
+          $cax = ""; $cpl = 0; $cu0 = 0; $cv0 = 0
+          if ($cfBase -eq "front") { $cax = "y"; $cpl = 0; $cu0 = [double]$t.pos_x_mm; $cv0 = [double]$t.pos_y_mm }
+          elseif ($cfBase -eq "rear") { $cax = "y"; $cpl = $dd; $cu0 = [double]$t.pos_x_mm; $cv0 = [double]$t.pos_y_mm }
+          elseif ($cfBase -eq "top") { $cax = "z"; $cpl = $hh; $cu0 = [double]$t.pos_x_mm; $cv0 = [double]$t.pos_y_mm }
+          else {
+            $cutoutChecks += [pscustomobject]@{ id = $tid; result = "UNVERIFIED"; reason = ("bilinmeyen yuz: " + [string]$t.face) }
+            continue
+          }
+          $cargs = $baseArgs.Clone()
+          $cargs.CheckCutout = $true
+          $cargs.CutAxis = $cax; $cargs.CutPlane = [double]$cpl
+          $cargs.CutU0 = [double]$cu0; $cargs.CutV0 = [double]$cv0
+          $cargs.CutW = [double]$t.width_mm; $cargs.CutL = [double]$t.length_mm
+          $cvj = Join-Path ([System.IO.Path]::GetTempPath()) ("vrfy-" + $cid + "-" + $tid + ".json")
+          $cargs.JsonOut = $cvj
+          $cres = Run-GVerify $cargs
+          $ctxt = $cres.text
+          $crr = "PASS"; if ($cres.code -ne 0) { $crr = "FAIL" } elseif ($ctxt -match "WARNING") { $crr = "WARNING" }
+          $mw = $null; $mpx = $null
+          try {
+            if (Test-Path -LiteralPath $cvj) {
+              $cj = Get-Content -LiteralPath $cvj -Raw | ConvertFrom-Json
+              if ($null -ne $cj.cut_measured_rect -and @($cj.cut_measured_rect).Count -ge 4 -and $null -ne $cj.cut_measured_rect[0]) {
+                $mw = [math]::Round([double]$cj.cut_measured_rect[2] - [double]$cj.cut_measured_rect[0], 4)
+                $mpx = [double]$cj.cut_measured_rect[0]
+              }
+            }
+          } catch { }
+          Remove-Item -LiteralPath $cvj -Force -ErrorAction SilentlyContinue
+          $cutoutChecks += [pscustomobject]@{ id = $tid; result = $crr; expected_width = [double]$t.width_mm; measured_width = $mw; expected_pos_x = [double]$cu0; measured_pos_x = $mpx }
+          if ($crr -eq "FAIL") { $worst = "FAIL" } elseif ($crr -eq "WARNING" -and $worst -eq "PASS") { $worst = "WARNING" }
+          $lastVerify = $ctxt
+        }
       $partStatus = $worst
     } while ($partStatus -eq "FAIL" -and $attempt -lt $MaxRetries)
 
     if ($partStatus -eq "FAIL") { $partStatus = "FAILED_AFTER_RETRIES" }
+
+    # --- mesh kalitesi (gercek olcum; Get-MeshQuality mock degil) ---
+    $meshInfo = $null
+    $meshStl = Join-Path $ProjectDir (Join-Path "output" ($cid + ".stl"))
+    if (Test-Path -LiteralPath $meshStl) {
+      try {
+        $mqTxt = & (Join-Path $EngineDir "Get-MeshQuality.ps1") -StlFile $meshStl -AsJson 2>&1 | Out-String
+        $meshInfo = $mqTxt | ConvertFrom-Json
+      } catch { $meshInfo = $null }
+    }
+    if ($null -ne $meshInfo -and [string]$meshInfo.status -eq "FAIL") {
+      $partStatus = "FAILED_AFTER_RETRIES"
+      $lastVerify = ($lastVerify + " | MESH-FAIL: " + (@($meshInfo.failures) -join "; "))
+    }
   } catch {
     $partStatus = "BLOCKED"
     $lastVerify = $_.Exception.Message
@@ -404,13 +483,36 @@ foreach ($c in @($gspecObj.components)) {
     if ([string]$wrn -match [regex]::Escape("(" + $cid + ")")) { $mfgCat = "WARNING" }
   }
   if ($partStatus -eq "BLOCKED") { $mfgCat = "BLOCKED" }
+  # Duvar/taban: construction metadata (mesh olcumu degil; method alani ayirir).
+  $wallCheck = $null
+  $baseCheck = $null
+  if ($null -ne $c.hollow -and $null -ne $c.hollow.wall_mm) {
+    $wallCheck = [pscustomobject]@{ method = "construction"; thickness_mm = [double]$c.hollow.wall_mm; source = "hollow.wall_mm" }
+  }
+  if ($null -ne $c.hollow -and $null -ne $c.hollow.bottom_thickness_mm) {
+    $baseCheck = [pscustomobject]@{ method = "construction"; thickness_mm = [double]$c.hollow.bottom_thickness_mm; source = "hollow.bottom_thickness_mm" }
+  }
+  $meshComps = $null
+  $meshStat = $null
+  if ($null -ne $meshInfo) {
+    $meshComps = [int]$meshInfo.connected_components
+    $meshStat = [string]$meshInfo.status
+  }
   Write-GValidation $ProjectDir $cid ([pscustomobject]@{
     status = $partStatus
     part = $cid
     categories = [pscustomobject]@{ geometry = $geoCat; feature = $featCat; assembly = $asmCat; manufacturability = $mfgCat }
     bbox_min = @($expMin); bbox_max = @($expMax)
+    bbox_check = [pscustomobject]@{ expected_min = @($expMin); expected_max = @($expMax); tolerance_mm = $MeasurementTolerance; status = $partStatus }
     file_bytes = $(if ($stlInfo) { $stlInfo.Length } else { 0 })
     hole_checks = @($holeChecks)
+    cutout_checks = @($cutoutChecks)
+    expected_holes = @(@($c.holes) | Where-Object { $_ -and [string]$_.id -notlike "mp*" }).Count
+    actual_holes = @(@($holeChecks) | Where-Object { $_ -and [string]$_.result -ne "UNVERIFIED" }).Count
+    wall_check = $wallCheck
+    base_check = $baseCheck
+    connected_components = $meshComps
+    mesh_status = $meshStat
     retries = [math]::Max(0, ($attempt - 1))
     detail_head = ($lastVerify -split '\r\n|\r|\n' | Select-Object -First 3) -join " | "
   })
