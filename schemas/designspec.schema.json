@@ -123,6 +123,11 @@
         }
       }
     },
+    "disabled_features": {
+      "type": "array",
+      "description": "Acik ret bildirilen feature'lar (lid, hole, slot, fillet, chamfer). Uretim katmanlari bunlari ekleyemez.",
+      "items": { "type": "string" }
+    },
     "assembly": {
       "type": ["object", "null"],
       "properties": {

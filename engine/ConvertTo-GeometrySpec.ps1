@@ -86,6 +86,45 @@ $low = [regex]::Replace($low, '(\d+(?:[.,]\d+)?)\s*cm\b', { param($m) ((Get-Num 
 $low = [regex]::Replace($low, '(\d+(?:[.,]\d+)?)\s*(inch|in[c\u00e7])\b', { param($m) ([Math]::Round((Get-Num $m.Groups[1].Value) * 25.4, 3)).ToString() + " mm" })
 $questions = New-Object System.Collections.Generic.List[string]
 
+# Negative intent (acik ret): eslesen feature uretilmez, DesignSpec'te korunur.
+# Kural: ozellik anahtar kelimesi + ret-fiili 50 karakter icinde (her iki sira),
+# ya da siz/siz-soneki (kapaksiz, deliksiz). Pencere disi eslesme sayilmaz.
+$negVerbsRx = 'istemiyorum|istemem|olmas[i\u0131]n|yok|ekleme|eklemeyin|yapma|yapmay[i\u0131]n|a[c\u00e7]ma|delme|koyma|kullanma|kald[i\u0131]r'
+$negSpecs = @(
+  @{ f = "lid"; kw = 'kapak|lid'; nos = @('kapaks[i\u0131]z'); ma = @() },
+  @{ f = "hole"; kw = 'deli[k\u011fg]\w*'; nos = @('deli[k\u011fg]siz'); ma = @() },
+  @{ f = "slot"; kw = 'slot|kanal|kesik|a[c\u00e7][i\u0131]kl[i\u0131][k\u011fg]'; nos = @('slotsuz'); ma = @() },
+  @{ f = "fillet"; kw = 'yuvarlat|fillet'; nos = @(); ma = @('yuvarlatma') },
+  @{ f = "chamfer"; kw = 'pah'; nos = @(); ma = @('pah\s*k[i\u0131]rma') }
+)
+$negated = New-Object System.Collections.Generic.List[string]
+foreach ($ns in $negSpecs) {
+  $hit = $false
+  foreach ($no in @($ns.nos)) {
+    if ([regex]::IsMatch($low, $no)) { $hit = $true }
+  }
+  if (-not $hit) {
+    foreach ($vm in [regex]::Matches($low, $negVerbsRx)) {
+      foreach ($km in [regex]::Matches($low, [string]$ns.kw)) {
+        if ([Math]::Abs($vm.Index - $km.Index) -le 50) { $hit = $true; break }
+      }
+      if ($hit) { break }
+    }
+  }
+  if (-not $hit) {
+    foreach ($mf in @($ns.ma)) {
+      foreach ($mm in [regex]::Matches($low, $mf)) {
+        foreach ($km in [regex]::Matches($low, [string]$ns.kw)) {
+          if ([Math]::Abs($mm.Index - $km.Index) -le 50) { $hit = $true; break }
+        }
+        if ($hit) { break }
+      }
+      if ($hit) { break }
+    }
+  }
+  if ($hit) { $negated.Add([string]$ns.f) | Out-Null }
+}
+
 $components = New-Object System.Collections.Generic.List[object]
 $comp = [pscustomobject]@{
   id = "body"; label = "ana govde"
@@ -189,8 +228,8 @@ if ($low -match "ge[c\u00e7]i[s\u015f]li" -or $low -match "d[u\u00fc]z\s*ge[c\u0
 elseif ($low -match "\bk[o\u00f6]r\w{0,2}\b") { $typeKw = "blind" }
 elseif ($low -match "hav[s\u015f]a") { $typeKw = "countersink" }
 elseif ($low -match "g[o\u00f6]mme" -or $low -match "counterbore") { $typeKw = "counterbore" }
-$mentionsHole = ([regex]::IsMatch($low, $holeStemRx)) -or ($low -match "kenardan")
-if ($null -eq $diaVal -and ($null -ne $typeKw -or $mentionsHole)) {
+$mentionsHole = ([regex]::IsMatch($low, $holeStemRx))
+if ($null -eq $diaVal -and ($null -ne $typeKw -or $mentionsHole) -and -not ($negated -contains "hole")) {
   $comp.holes = @([pscustomobject]@{
     id = "h1"; hole_type = $(if ($null -ne $typeKw) { $typeKw } else { "through" }); diameter_mm = $null
     center_x_mm = $null; center_y_mm = $null; axis = "z"
@@ -199,7 +238,7 @@ if ($null -eq $diaVal -and ($null -ne $typeKw -or $mentionsHole)) {
   })
   $questions.Add("Delik capi ve merkezi nedir? Ornek: delik 20 merkez 15,15.")
 }
-if ($null -ne $diaVal) {
+if ($null -ne $diaVal -and -not ($negated -contains "hole")) {
   $htype = "through"
   if ($null -ne $typeKw) { $htype = $typeKw }
   $mc = [regex]::Match($low, 'merkez\s*(\d+(?:[.,]\d+)?)\s*[,;]\s*(\d+(?:[.,]\d+)?)')
@@ -429,7 +468,7 @@ if ($mpm.Success) {
   }
 }
 
-if ($low -match "slot" -or $low -match "kanal" -or $low -match "kesik" -or $low -match "a[c\u00e7][i\u0131]kl[i\u0131][k\u011fg]") {
+if (-not ($negated -contains "slot") -and ($low -match "slot" -or $low -match "kanal" -or $low -match "kesik" -or $low -match "a[c\u00e7][i\u0131]kl[i\u0131][k\u011fg]")) {
   # Ikili olcu: govde uclusunun parcasi olamaz (lookahead), govde spaniyla cakisan
   # aday atilir; kalanlar icinden slot anahtar kelimesine en yakin secilir.
   $pairPat = '(\d+(?:[.,]\d+)?)\s*(?:mm\s*)?' + $DimSepRx + '\s*(\d+(?:[.,]\d+)?)(?!\s*(?:mm\s*)?' + $DimSepRx + '\s*\d)'
@@ -549,8 +588,8 @@ if ($low -match "slot" -or $low -match "kanal" -or $low -match "kesik" -or $low 
 }
 
 $rm = [regex]::Match($low, 'yuvarlat?\s*(\d+(?:[.,]\d+)?)')
-if ($rm.Success) { $comp.edge_notes = @([pscustomobject]@{ kind = "fillet"; value_mm = (Get-Num $rm.Groups[1].Value); target = "kenarlar" }) }
-elseif ($low -match "yuvarla") { $comp.edge_notes = @([pscustomobject]@{ kind = "fillet"; value_mm = $null; target = "kenarlar" }) }
+if (-not ($negated -contains "fillet") -and $rm.Success) { $comp.edge_notes = @([pscustomobject]@{ kind = "fillet"; value_mm = (Get-Num $rm.Groups[1].Value); target = "kenarlar" }) }
+elseif (-not ($negated -contains "fillet") -and ($low -match "yuvarla")) { $comp.edge_notes = @([pscustomobject]@{ kind = "fillet"; value_mm = $null; target = "kenarlar" }) }
 # Pah: "pah 2" ve "2 mm pah" siralamalari; "gerekiyorsa" sartli ifadeler elenir,
 # kesin ifade kazanir (hepsi sartliysa deterministik ilk aday).
 $chCands = @()
@@ -568,11 +607,15 @@ foreach ($cnd in $chCands) {
   break
 }
 if ($null -eq $chVal -and $chCands.Count -gt 0) { $chVal = $chCands[0].v }
-if ($null -ne $chVal) { $comp.edge_notes = @($comp.edge_notes) + @([pscustomobject]@{ kind = "chamfer"; value_mm = $chVal; target = "kenarlar" }) }
-elseif ($low -match "pah") { $comp.edge_notes = @($comp.edge_notes) + @([pscustomobject]@{ kind = "chamfer"; value_mm = $null; target = "kenarlar" }) }
+if ($null -ne $chVal -and -not ($negated -contains "chamfer")) { $comp.edge_notes = @($comp.edge_notes) + @([pscustomobject]@{ kind = "chamfer"; value_mm = $chVal; target = "kenarlar" }) }
+elseif (-not ($negated -contains "chamfer") -and ($low -match "pah")) { $comp.edge_notes = @($comp.edge_notes) + @([pscustomobject]@{ kind = "chamfer"; value_mm = $null; target = "kenarlar" }) }
 # Yaricap: "yaricap 5" ve "5 mm yaricapla" siralamalari; degersiz fillet varsa doldur.
+# Retli fillet'e yaricap islenmez.
+$rad = $null
+if (-not ($negated -contains "fillet")) {
 $rad = Find-One $low '(?:d[i\u0131][s\u015f]\s*)?(?:k[o\u00f6][s\u015f]e\s*)?yar[i\u0131][c\u00e7]ap[i\u0131]?\s*(\d+(?:[.,]\d+)?)'
 if ($null -eq $rad) { $rad = Find-One $low '(\d+(?:[.,]\d+)?)\s*mm\s*yar[i\u0131][c\u00e7]ap\w*' }
+}
 if ($null -ne $rad) {
   $filled = $false
   foreach ($en in @($comp.edge_notes)) {
@@ -697,7 +740,8 @@ if ($null -ne $divN) {
   }
 }
 # "kapaksiz" (kapak YOK) ve "kapak montaj noktasi" (montaj ozelligi, kapak DEGIL) lid uretmez.
-if (($low -match "kapak" -and $low -notmatch "kapaks[i\u0131]z" -and $low -notmatch "kapak\s+montaj") -or $low -match "iki par[c\u00e7]a" -or ($low -match "taban" -and $low -match "destek")) {
+# Acik ret (kapak istemiyorum vb.) tum lid tetikleyicileri ezer.
+if (-not ($negated -contains "lid") -and (($low -match "kapak" -and $low -notmatch "kapaks[i\u0131]z" -and $low -notmatch "kapak\s+montaj") -or $low -match "iki par[c\u00e7]a" -or ($low -match "taban" -and $low -match "destek"))) {
   $lid = [pscustomobject]@{
     id = "lid"; label = "kapak"
     base = [pscustomobject]@{ shape = "box"; width_mm = $comp.base.width_mm; depth_mm = $comp.base.depth_mm; height_mm = $null }
@@ -734,6 +778,7 @@ $specObj2 = [pscustomobject]@{
   project_name = $ProjectName; prompt = $Prompt
   metadata = [pscustomobject]@{ spec_version = $specVer }
   components = @($components.ToArray()); assembly = $assembly; material = $specMaterial
+  disabled_features = @($negated.ToArray())
 }
 
 if ($OutPath -ne "") {

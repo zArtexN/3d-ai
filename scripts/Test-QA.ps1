@@ -305,6 +305,103 @@ try {
 } catch { Add-QAResult "T-QA-22" $false $_.Exception.Message }
 finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
 
+# T-QA-23..29: cutout cevaplari (olcu/konum/derinlik; tek sayi ve dogal formlar).
+function New-QACut($w, $l, $px, $py, $dep, $pen, $st) {
+  return [pscustomobject]@{
+    id = "c1"; kind = "rect"; face = "front"; pos_x_mm = $px; pos_y_mm = $py
+    width_mm = $w; length_mm = $l; depth_mm = $dep; penetration = $pen; status = $st
+  }
+}
+function New-QACutBody($cut) {
+  return [pscustomobject]@{
+    id = "body"; label = "body"
+    base = [pscustomobject]@{ shape = "box"; width_mm = 80; depth_mm = 40; height_mm = 20 }
+    hollow = $null; holes = @(); cutouts = @($cut); edge_notes = @(); transforms = @()
+    tolerance = $null; expected_bbox = $null; pending_rotate = $null; pending_mirror = $false
+  }
+}
+function Get-QACut($sp) {
+  return (Get-Content -LiteralPath $sp -Raw | ConvertFrom-Json).components[0].cutouts[0]
+}
+# T-QA-23: olcu+derinlik korunurken tek sayi ile pos_x.
+$d = New-QADir "T-QA-23"
+try {
+  $sp = New-QASpec $d "T-QA-23" (New-QACutBody (New-QACut 20 10 $null 12 8 $null "missing"))
+  $r = Invoke-QAAnswer $sp "body-cutout-c1" "10"
+  $t = Get-QACut $sp
+  $ok = ($r.applied -and [double]$t.pos_x_mm -eq 10 -and [double]$t.pos_y_mm -eq 12 -and [double]$t.depth_mm -eq 8 -and [double]$t.width_mm -eq 20 -and [double]$t.length_mm -eq 10)
+  Add-QAResult "T-QA-23" $ok $(if ($ok) { "tek sayi pos_x doldurdu, digerleri korundu" } else { "applied=$($r.applied) err=$($r.error)" })
+} catch { Add-QAResult "T-QA-23" $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+# T-QA-24: sonraki tek sayi ile pos_y.
+$d = New-QADir "T-QA-24"
+try {
+  $sp = New-QASpec $d "T-QA-24" (New-QACutBody (New-QACut 20 10 70 $null 8 $null "missing"))
+  $r = Invoke-QAAnswer $sp "body-cutout-c1" "3"
+  $t = Get-QACut $sp
+  $ok = ($r.applied -and [double]$t.pos_y_mm -eq 3 -and [double]$t.pos_x_mm -eq 70 -and [double]$t.depth_mm -eq 8)
+  Add-QAResult "T-QA-24" $ok $(if ($ok) { "tek sayi pos_y doldurdu" } else { "applied=$($r.applied) err=$($r.error)" })
+} catch { Add-QAResult "T-QA-24" $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+# T-QA-25: sonraki tek sayi ile depth + status ok.
+$d = New-QADir "T-QA-25"
+try {
+  $sp = New-QASpec $d "T-QA-25" (New-QACutBody (New-QACut 20 10 70 12 $null $null "missing"))
+  $r = Invoke-QAAnswer $sp "body-cutout-c1" "6"
+  $t = Get-QACut $sp
+  $ok = ($r.applied -and [double]$t.depth_mm -eq 6 -and [string]$t.status -eq "ok")
+  Add-QAResult "T-QA-25" $ok $(if ($ok) { "tek sayi depth doldurdu, status ok" } else { "applied=$($r.applied) err=$($r.error)" })
+} catch { Add-QAResult "T-QA-25" $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+# T-QA-26: "yatay 10" ve "dikey alttan 3" dogal formlar.
+$d = New-QADir "T-QA-26"
+try {
+  $sp = New-QASpec $d "T-QA-26" (New-QACutBody (New-QACut 20 10 $null $null 8 $null "missing"))
+  $r1 = Invoke-QAAnswer $sp "body-cutout-c1" "yatay 10"
+  $t1 = Get-QACut $sp
+  $r2 = Invoke-QAAnswer $sp "body-cutout-c1" "dikey alttan 3"
+  $t2 = Get-QACut $sp
+  $ok = ($r1.applied -and [double]$t1.pos_x_mm -eq 10 -and $r2.applied -and [double]$t2.pos_y_mm -eq 3 -and [double]$t2.pos_x_mm -eq 10 -and [double]$t2.depth_mm -eq 8)
+  Add-QAResult "T-QA-26" $ok $(if ($ok) { "yatay/dikey formlar islendi" } else { "e1=$($r1.error) e2=$($r2.error)" })
+} catch { Add-QAResult "T-QA-26" $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+# T-QA-27: "konum 10,3" ve "konum 10 3" + bilinen alanlar korunur.
+$d = New-QADir "T-QA-27"
+try {
+  $sp = New-QASpec $d "T-QA-27" (New-QACutBody (New-QACut 20 10 $null $null 8 $null "missing"))
+  $r1 = Invoke-QAAnswer $sp "body-cutout-c1" "konum 10,3"
+  $t1 = Get-QACut $sp
+  $sp2dir = New-QADir "T-QA-27b"
+  $sp2 = New-QASpec $sp2dir "T-QA-27b" (New-QACutBody (New-QACut 20 10 $null $null 8 $null "missing"))
+  $r2 = Invoke-QAAnswer $sp2 "body-cutout-c1" "konum 10 3"
+  $t2 = Get-QACut $sp2
+  $ok = ($r1.applied -and [double]$t1.pos_x_mm -eq 10 -and [double]$t1.pos_y_mm -eq 3 -and [double]$t1.width_mm -eq 20 -and [double]$t1.depth_mm -eq 8 -and $r2.applied -and [double]$t2.pos_x_mm -eq 10 -and [double]$t2.pos_y_mm -eq 3)
+  Add-QAResult "T-QA-27" $ok $(if ($ok) { "konum formlari islendi, bilinenler korundu" } else { "e1=$($r1.error) e2=$($r2.error)" })
+} catch { Add-QAResult "T-QA-27" $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item -LiteralPath (Join-Path ([System.IO.Path]::GetTempPath()) "qa-T-QA-27b") -Recurse -Force -ErrorAction SilentlyContinue }
+# T-QA-28: "5x12" ve "derinlik 6" mevcut davranis korunur.
+$d = New-QADir "T-QA-28"
+try {
+  $sp = New-QASpec $d "T-QA-28" (New-QACutBody (New-QACut $null $null 70 12 $null $null "missing"))
+  $r1 = Invoke-QAAnswer $sp "body-cutout-c1" "5x12"
+  $t1 = Get-QACut $sp
+  $r2 = Invoke-QAAnswer $sp "body-cutout-c1" "derinlik 6"
+  $t2 = Get-QACut $sp
+  $ok = ($r1.applied -and [double]$t1.width_mm -eq 5 -and [double]$t1.length_mm -eq 12 -and $r2.applied -and [double]$t2.depth_mm -eq 6 -and [double]$t2.pos_x_mm -eq 70 -and [double]$t2.pos_y_mm -eq 12)
+  Add-QAResult "T-QA-28" $ok $(if ($ok) { "olcu ve derinlik formlari korunur" } else { "e1=$($r1.error) e2=$($r2.error)" })
+} catch { Add-QAResult "T-QA-28" $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+# T-QA-29: anlasilmayan cevap degerleri silmez.
+$d = New-QADir "T-QA-29"
+try {
+  $sp = New-QASpec $d "T-QA-29" (New-QACutBody (New-QACut 20 10 70 $null 8 $null "missing"))
+  $r = Invoke-QAAnswer $sp "body-cutout-c1" "abc"
+  $t = Get-QACut $sp
+  $ok = ((-not $r.applied) -and [double]$t.width_mm -eq 20 -and [double]$t.pos_x_mm -eq 70 -and [double]$t.depth_mm -eq 8 -and $null -eq $t.pos_y_mm)
+  Add-QAResult "T-QA-29" $ok $(if ($ok) { "reddedildi, degerler korundu" } else { "applied=$($r.applied)" })
+} catch { Add-QAResult "T-QA-29" $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+
 $passed = @($results | Where-Object { $_.result -eq "PASS" }).Count
 Write-Output "----------------------------------------"
 Write-Output "QA SONUC: $passed / $($results.Count) test gecti"

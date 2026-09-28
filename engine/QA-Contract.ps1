@@ -190,18 +190,33 @@ function Invoke-QuestionParser($specObj, $question, $answer) {
       if ($null -eq $t) { return @{ ok = $false; message = ("Kesik bulunamadi: " + $tid) } }
       $ansN = ([string]$answer -replace '[\u2715\u2716\u2a2f\u00d7\*]', 'x') -replace '(?i)[c\u00e7]arp[i\u0131]', 'x'
       $dm = [regex]::Match($ansN, '(-?\d+(?:[.,]\d+)?)\s*[xX]\s*(-?\d+(?:[.,]\d+)?)')
-      if ($dm.Success) { $t.width_mm = Get-NumU $dm.Groups[1].Value; $t.length_mm = Get-NumU $dm.Groups[2].Value }
+      $handled = $false
+      if ($dm.Success) { $t.width_mm = Get-NumU $dm.Groups[1].Value; $t.length_mm = Get-NumU $dm.Groups[2].Value; $handled = $true }
       elseif ($null -eq $t.width_mm -or $null -eq $t.length_mm) { return @{ ok = $false; message = ("Kesik olcusu anlasilmadi (ornek: 20x10). Girilen: " + $answer) } }
-      $pm = [regex]::Match([string]$answer, 'konum\s*(-?\d+(?:[.,]\d+)?)\s*[,;]\s*(-?\d+(?:[.,]\d+)?)')
-      if ($pm.Success) { $t.pos_x_mm = Get-NumU $pm.Groups[1].Value; $t.pos_y_mm = Get-NumU $pm.Groups[2].Value }
+      $pm = [regex]::Match([string]$answer, 'konum\s*(-?\d+(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d+(?:[.,]\d+)?)')
+      if ($pm.Success) { $t.pos_x_mm = Get-NumU $pm.Groups[1].Value; $t.pos_y_mm = Get-NumU $pm.Groups[2].Value; $handled = $true }
       else {
         $pm1 = [regex]::Match([string]$answer, 'konum\s*(-?\d+(?:[.,]\d+)?)')
-        if ($pm1.Success -and $null -eq $t.pos_x_mm) { $t.pos_x_mm = Get-NumU $pm1.Groups[1].Value }
+        if ($pm1.Success -and $null -eq $t.pos_x_mm) { $t.pos_x_mm = Get-NumU $pm1.Groups[1].Value; $handled = $true }
+      }
+      $yat = [regex]::Match([string]$answer, 'yatay\s*(-?\d+(?:[.,]\d+)?)')
+      if ($yat.Success) {
+        $yv = Get-NumU $yat.Groups[1].Value
+        if ($yv -le 0) { return @{ ok = $false; message = ("Yatay konum pozitif olmali. Girilen: " + $answer) } }
+        $t.pos_x_mm = $yv; $handled = $true
+      }
+      $dik = [regex]::Match([string]$answer, 'dikey\s*(?:alttan\s*)?(-?\d+(?:[.,]\d+)?)')
+      if ($dik.Success) {
+        $dv2 = Get-NumU $dik.Groups[1].Value
+        if ($dv2 -le 0) { return @{ ok = $false; message = ("Dikey konum pozitif olmali. Girilen: " + $answer) } }
+        $t.pos_y_mm = $dv2; $handled = $true
       }
       $dep = [regex]::Match([string]$answer, 'derinlik\s*(-?\d+(?:[.,]\d+)?)')
-      if ($dep.Success) { $t.depth_mm = Get-NumU $dep.Groups[1].Value }
+      if ($dep.Success) { $t.depth_mm = Get-NumU $dep.Groups[1].Value; $handled = $true }
       # Olcusu bilinen kesikte yalın sayı ilk eksige yazilir: pos_x, pos_y, depth sirasiyla.
-      if (-not $dm.Success -and -not $pm.Success -and -not $dep.Success -and $pm1 -eq $null) {
+      # (Eski `$pm1 -eq $null` kosulu Match nesnesi hic null olmadigi icin olu koddu;
+      # duzeltme: eslesme bayraklari + $handled ile karar verilir.)
+      if (-not $handled) {
         $solo = [regex]::Match([string]$answer, '^\s*(-?\d+(?:[.,]\d+)?)\s*(?:mm)?\s*$')
         if ($solo.Success) {
           $sv = Get-NumU $solo.Groups[1].Value

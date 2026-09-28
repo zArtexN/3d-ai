@@ -1,5 +1,14 @@
 # CHANGELOG — 3D AI Designer
 
+## UNRELEASED (adim-holefix)
+- Negative intent: lid/hole/slot/fillet/chamfer acik reddi uretilmez; disabled_features spec kokunde korunur.
+- Ciplak "kenardan" tek basina delik kaniti sayilmaz.
+- Cutout Q&A: tek sayi / yatay / dikey / konum-bosluk formlari ($handled duzeltmesi).
+- Divider hole pattern: body.divider_pattern (spec 2.1); delik cikis duzlemi floor (hollow+acik).
+- Printer no-fake: template null kritikler, fallback kaldirildi, Slice BLOCKED.
+- Knowledge boundary: provenance metadata + leakage testleri.
+- Stale div artifakt uyarisi (silme yok).
+
 ## V2.1.0
 - Parser hardening: 4 delik kosegen-yerlesimi (deterministik corner_pattern + placement metadata).
 - Delik capi: O/o/çap-oneki/`N mm çapında` kalıpları; çekimli `deliği/delikler` gövdeleri; counterbore `Ø8` ana çap sanılmıyor.
