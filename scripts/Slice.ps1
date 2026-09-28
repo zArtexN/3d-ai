@@ -13,13 +13,22 @@ param(
   [Parameter(Mandatory = $true)][string]$FilamentProfile,
   [Parameter(Mandatory = $true)][string]$OutDir,
   [string]$ProcessProfile = "",
-  [string]$OrcaExe = "C:\Program Files\OrcaSlicer\orca-slicer.exe"
+  [string]$OrcaExe = "C:\Program Files\OrcaSlicer\orca-slicer.exe",
+  [string]$PrinterJson = ""
 )
 
 $ErrorActionPreference = "Stop"
 if (-not (Test-Path -LiteralPath $Input3mf)) { throw "Giris dosyasi bulunamadi: $Input3mf" }
 if (-not (Test-Path -LiteralPath $OrcaExe)) { throw "OrcaSlicer bulunamadi: $OrcaExe" }
-if ($PrinterProfile -like "REPLACE*") { throw "Gecerli bir OrcaSlicer yazici profili verin (printers/*.json). Placeholder ile dilimleme yasak." }
+# BLOCKED: gercek profiller yoksa dilimleme baslamaz (placeholder/ bos deger yasak).
+if ([string]::IsNullOrWhiteSpace($PrinterProfile) -or $PrinterProfile -like "REPLACE*") { throw "BLOCKED: gecerli bir OrcaSlicer yazici profili verin (printers/*.json). Placeholder ile dilimleme yasak." }
+if ([string]::IsNullOrWhiteSpace($FilamentProfile) -or $FilamentProfile -like "REPLACE*") { throw "BLOCKED: gecerli bir OrcaSlicer filament profili verin. Placeholder ile dilimleme yasak." }
+if ([string]::IsNullOrWhiteSpace($ProcessProfile) -or $ProcessProfile -like "REPLACE*") { throw "BLOCKED: gecerli bir OrcaSlicer process profili verin. Placeholder ile dilimleme yasak." }
+if ($PrinterJson -ne "") {
+  if (-not (Test-Path -LiteralPath $PrinterJson)) { throw "BLOCKED: yazici profil dosyasi bulunamadi: $PrinterJson" }
+  $pjSlice = Get-Content -LiteralPath $PrinterJson -Raw | ConvertFrom-Json
+  if ([string]$pjSlice.source -eq "template" -or $pjSlice.usable_for_slicing -eq $false) { throw "BLOCKED: '$($pjSlice.id)' sablon profildir; gercek yazici profili olmadan dilimleme yasak." }
+}
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 # Not: OrcaSlicer CLI surume gore degisir; gecerli komut profillerinle dogrulanmadan G-code uretme.

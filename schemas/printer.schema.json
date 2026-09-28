@@ -1,18 +1,36 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "3D AI Designer - yazici profili semasi (gelecek)",
-  "description": "printers/<yazici-id>.json dosyalari bu semaya uyar. Degerler SADECE gercek yazicidan alinir; uydurma profil YASAK. OrcaSlicer profil adlari birebir yazilir.",
+  "title": "3D AI Designer V2.0 - Yazici Profili",
+  "description": "printers/<yazici-id>.json dosyalari bu semaya uyar. Degerler SADECE gercek yazicidan alinir; uydurma profil YASAK. Bilinmeyen alan null birakilir.",
   "type": "object",
-  "required": ["id", "label", "nozzle_mm", "bed_mm", "min_wall_mm", "min_feature_mm", "min_hole_mm", "max_overhang_deg", "orca_profiles"],
+  "required": ["id", "label", "orca_profiles"],
   "properties": {
     "id": { "type": "string" },
     "label": { "type": "string" },
-    "nozzle_mm": { "type": "number", "exclusiveMinimum": 0 },
-    "bed_mm": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number", "exclusiveMinimum": 0 } },
-    "min_wall_mm": { "type": "number", "exclusiveMinimum": 0 },
-    "min_feature_mm": { "type": "number", "exclusiveMinimum": 0 },
-    "min_hole_mm": { "type": "number", "exclusiveMinimum": 0 },
-    "max_overhang_deg": { "type": "number", "minimum": 0, "maximum": 90 },
+    "usable_for_slicing": { "type": ["boolean", "null"], "description": "false = sablon; slicing icin gercek profil sart." },
+    "manufacturer": { "type": ["string", "null"], "description": "Yazici uretici (ornek: Creality, Prusa, Bambu Lab). null = UNKNOWN." },
+    "model": { "type": ["string", "null"], "description": "Yazici modeli (ornek: Ender 3 V2, MK4). null = UNKNOWN." },
+    "nozzle_mm": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "bed_mm": { "type": ["array", "null"], "minItems": 3, "maxItems": 3, "items": { "type": ["number", "null"], "exclusiveMinimum": 0 }, "description": "Build volume [X, Y, Z] mm; bilinmeyen eksen null, tamami bilinmiyorsa null." },
+    "bed_shape": { "type": ["string", "null"], "enum": ["rectangular", "circular", null], "description": "Tabla sekli. null = UNKNOWN." },
+    "extruder_type": { "type": ["string", "null"], "enum": ["direct_drive", "bowden", null], "description": "Ekstruder tipi. null = UNKNOWN." },
+    "build_plate": { "type": ["string", "null"], "description": "Tabla tipi (ornek: PEI, glass, magnetic). null = UNKNOWN." },
+    "max_temp_nozzle_c": { "type": ["number", "null"], "description": "Maks nozul sicakligi (C). null = UNKNOWN. UYDURMA!" },
+    "max_temp_bed_c": { "type": ["number", "null"], "description": "Maks tabla sicakligi (C). null = UNKNOWN. UYDURMA!" },
+    "recommended_materials": { "type": ["array", "null"], "items": { "type": "string" }, "description": "Onerlilen malzemeler listesi. null = UNKNOWN." },
+    "min_layer_height_mm": { "type": ["number", "null"], "description": "Min katman yuksekligi. null = UNKNOWN." },
+    "max_layer_height_mm": { "type": ["number", "null"], "description": "Maks katman yuksekligi. null = UNKNOWN." },
+    "max_volumetric_flow_mm3s": { "type": ["number", "null"], "description": "Maks hacimsel akis (mm3/s). null = UNKNOWN." },
+    "max_speed_mm_s": { "type": ["number", "null"], "description": "Maks baski hizi (mm/s). null = UNKNOWN." },
+    "max_acceleration_mm_s2": { "type": ["number", "null"], "description": "Maks ivme (mm/s2). null = UNKNOWN." },
+    "firmware": { "type": ["string", "null"], "description": "Firmware (ornek: Marlin, Klipper, RRF). null = UNKNOWN." },
+    "coordinate_system": { "type": ["string", "null"], "enum": ["cartesian", "corexy", "delta", null], "description": "Kinematik sistem. null = UNKNOWN." },
+    "origin": { "type": ["string", "null"], "enum": ["front_left", "center", null], "description": "Eksen origini. null = UNKNOWN." },
+    "auto_bed_leveling": { "type": ["boolean", "null"], "description": "Otomatik tabla seviyeleme. null = UNKNOWN." },
+    "min_wall_mm": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "min_feature_mm": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "min_hole_mm": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "max_overhang_deg": { "type": ["number", "null"], "minimum": 0, "maximum": 90 },
     "default_clearance_mm": { "type": ["number", "null"], "description": "null birakilir; gecme payi kullanicidan sorulur" },
     "orca_profiles": {
       "type": "object",
@@ -23,6 +41,8 @@
         "process": { "type": "string" }
       }
     },
-    "notes": { "type": "string" }
+    "notes": { "type": "string" },
+    "source": { "type": ["string", "null"], "description": "Profil kaynagi: 'user_input', 'preset', 'imported'. null = bilinmiyor." },
+    "created_at": { "type": ["string", "null"], "description": "Profil olusturulma tarihi ISO 8601." }
   }
 }

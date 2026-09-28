@@ -60,11 +60,25 @@ if ($ProjectDir -eq "") {
   $ProjectDir = Join-Path $pdir $specObj.project_name
 }
 if ($Printer -eq "") {
-  $Printer = "generic-fdm"
   if ($settings -and $settings.defaultPrinter) { $Printer = $settings.defaultPrinter }
 }
-$printerPath = $Printer
-if (-not [System.IO.Path]::IsPathRooted($printerPath)) { $printerPath = Join-Path $Root (Join-Path "printers" ($Printer + ".json")) }
+# Template gercek printer degildir: source=template veya usable_for_slicing=false
+# ise profil yok sayilir (uretim durmaz; yaziciya ozel kontrol UNKNOWN).
+$printerPath = ""
+$printerProfileId = ""
+if ($Printer -ne "") {
+  $cand = $Printer
+  if (-not [System.IO.Path]::IsPathRooted($cand)) { $cand = Join-Path $Root (Join-Path "printers" ($Printer + ".json")) }
+  if (Test-Path -LiteralPath $cand) {
+    try {
+      $pjTmp = Get-Content -LiteralPath $cand -Raw | ConvertFrom-Json
+      if ([string]$pjTmp.source -ne "template" -and $pjTmp.usable_for_slicing -ne $false) {
+        $printerPath = $cand
+        $printerProfileId = [string]$pjTmp.id
+      }
+    } catch { }
+  }
+}
 
 # 1. Design validation
 $dvOut = & (Join-Path $EngineDir "Test-DesignSpec.ps1") -Spec $Spec -Printer $printerPath -AsJson 2>&1
@@ -74,7 +88,7 @@ $dv = $dvTxt | ConvertFrom-Json
 if ($dvCode -ne 0) {
   New-Item -ItemType Directory -Force -Path $ProjectDir | Out-Null
   Write-ValidationJson $ProjectDir ([pscustomobject]@{
-    status = "BLOCKED"; reason = "design validation hatalari"; errors = @($dv.errors); warnings = @($dv.warnings); retries = 0; printer = $Printer
+    status = "BLOCKED"; reason = "design validation hatalari"; errors = @($dv.errors); warnings = @($dv.warnings); retries = 0; printer = $printerProfileId
   })
   Write-Output "ENGINE: BLOCKED - kritik hata var, model uretilmedi."
   foreach ($e in $dv.errors) { Write-Output "  ERROR: $e" }
@@ -90,7 +104,7 @@ if (@($specObj.assemblies | Where-Object { $_ -ne $null }).Count -gt 0) { $unsup
 if ($unsupported.Count -gt 0) {
   New-Item -ItemType Directory -Force -Path $ProjectDir | Out-Null
   Write-ValidationJson $ProjectDir ([pscustomobject]@{
-    status = "BLOCKED"; reason = "desteklenmeyen geometri"; errors = @($unsupported); warnings = @($dv.warnings); retries = 0; printer = $Printer
+    status = "BLOCKED"; reason = "desteklenmeyen geometri"; errors = @($unsupported); warnings = @($dv.warnings); retries = 0; printer = $printerProfileId
   })
   Write-Output "ENGINE: BLOCKED - desteklenmeyen geometri."
   foreach ($e in $unsupported) { Write-Output "  ERROR: $e" }
@@ -191,7 +205,7 @@ $valObj = [pscustomobject]@{
   hole_checks = @($holeResults)
   design_warnings = @($dv.warnings)
   retries = ($attempt - 1)
-  printer = $Printer
+  printer = $printerProfileId
 }
 Write-ValidationJson $ProjectDir $valObj
 

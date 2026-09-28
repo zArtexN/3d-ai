@@ -9,6 +9,6 @@
   "freeCadExe": null,
   "orcaSlicerExe": null,
   "projectsDir": "projects",
-  "defaultPrinter": "generic-fdm",
+  "defaultPrinter": null,
   "defaultOutput": "output"
 }

@@ -62,11 +62,25 @@ if ($ProjectDir -eq "") {
   $ProjectDir = Join-Path $pdir $gspecObj.project_name
 }
 if ($Printer -eq "") {
-  $Printer = "generic-fdm"
   if ($gsettings -and $gsettings.defaultPrinter) { $Printer = $gsettings.defaultPrinter }
 }
-$printerPath = $Printer
-if (-not [System.IO.Path]::IsPathRooted($printerPath)) { $printerPath = Join-Path $Root (Join-Path "printers" ($Printer + ".json")) }
+# Template gercek printer degildir: source=template veya usable_for_slicing=false
+# ise profil yok sayilir (geometri uretimi durmaz; yaziciya ozel kontrol UNKNOWN).
+$printerPath = ""
+$printerProfileId = ""
+if ($Printer -ne "") {
+  $cand = $Printer
+  if (-not [System.IO.Path]::IsPathRooted($cand)) { $cand = Join-Path $Root (Join-Path "printers" ($Printer + ".json")) }
+  if (Test-Path -LiteralPath $cand) {
+    try {
+      $pjTmp = Get-Content -LiteralPath $cand -Raw | ConvertFrom-Json
+      if ([string]$pjTmp.source -ne "template" -and $pjTmp.usable_for_slicing -ne $false) {
+        $printerPath = $cand
+        $printerProfileId = [string]$pjTmp.id
+      }
+    } catch { }
+  }
+}
 
 $exportScript = Join-Path $Root (Join-Path "scripts" "Export-Stl.ps1")
 $verifyScript = Join-Path $Root (Join-Path "scripts" "Verify-Stl.ps1")
@@ -86,7 +100,7 @@ if ($dvCode -ne 0) {
   New-Item -ItemType Directory -Force -Path $ProjectDir | Out-Null
   Write-GValidation $ProjectDir "project" ([pscustomobject]@{
     status = "BLOCKED"; reason = "design validation hatalari"
-    errors = @($dv.errors); warnings = @($dv.warnings); printer = $Printer
+    errors = @($dv.errors); warnings = @($dv.warnings); printer = $printerProfileId
   })
   Write-Output "GENGINE: BLOCKED - kritik hata var, model uretilmedi."
   foreach ($e in $dv.errors) { Write-Output "  ERROR: $e" }

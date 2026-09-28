@@ -25,18 +25,18 @@ $gspecObj = ConvertTo-CanonicalSpec (Get-Content -LiteralPath $SpecFile -Raw | C
 $errors = New-Object System.Collections.Generic.List[string]
 $warnings = New-Object System.Collections.Generic.List[string]
 
-$minWall = 1.2; $minFeature = 0.8; $minHole = 2.0
+$minWall = $null; $minFeature = $null; $minHole = $null
 $printerId = ""
 if ($Printer -ne "" -and (Test-Path -LiteralPath $Printer)) {
   try {
     $pj = Get-Content -LiteralPath $Printer -Raw | ConvertFrom-Json
     $printerId = $pj.id
-    if ($pj.min_wall_mm -gt 0) { $minWall = [double]$pj.min_wall_mm }
-    if ($pj.min_feature_mm -gt 0) { $minFeature = [double]$pj.min_feature_mm }
-    if ($pj.min_hole_mm -gt 0) { $minHole = [double]$pj.min_hole_mm }
-  } catch { $warnings.Add("WARNING: yazici profili okunamadi; varsayilan limitler kullanildi") }
+    if ($null -ne $pj.min_wall_mm -and [double]$pj.min_wall_mm -gt 0) { $minWall = [double]$pj.min_wall_mm }
+    if ($null -ne $pj.min_feature_mm -and [double]$pj.min_feature_mm -gt 0) { $minFeature = [double]$pj.min_feature_mm }
+    if ($null -ne $pj.min_hole_mm -and [double]$pj.min_hole_mm -gt 0) { $minHole = [double]$pj.min_hole_mm }
+  } catch { $warnings.Add("WARNING: yazici profili okunamadi; yaziciya ozel limitler kontrol edilmedi") }
 } else {
-  $warnings.Add("WARNING: yazici profili verilmedi; varsayilan limitlerle karsilastirildi")
+  $warnings.Add("WARNING: printer profili verilmedi; yaziciya ozel limitler kontrol edilmedi")
 }
 
 $compIds = New-Object System.Collections.Generic.List[string]
@@ -81,7 +81,7 @@ foreach ($c in @($gspecObj.components)) {
     }
     if ($null -eq $c.hollow.open_top) { $errors.Add("($cid) hollow.open_top belirtilmemis (ustu acik mi?) -> model olusturulamaz") }
     if ($null -ne $c.hollow.bottom_thickness_mm -and $bh -gt 0 -and [double]$c.hollow.bottom_thickness_mm -ge $bh) { $errors.Add("($cid) hollow.bottom_thickness_mm govde yuksekligini asiyor -> model olusturulamaz") }
-    if ($null -ne $wl -and [double]$wl -gt 0 -and [double]$wl -lt $minWall) {
+    if ($null -ne $wl -and [double]$wl -gt 0 -and $null -ne $minWall -and [double]$wl -lt $minWall) {
       $warnings.Add("WARNING: ($cid) duvar $wl mm < limit $minWall mm; deger korundu")
     }
   }
@@ -110,7 +110,7 @@ foreach ($c in @($gspecObj.components)) {
     $hid = $h.id
     if ($null -eq $h.diameter_mm -or [double]$h.diameter_mm -le 0) { $errors.Add("($cid) delik '$hid': cap pozitif olmali"); continue }
     $dd = [double]$h.diameter_mm
-    if ($dd -lt $minHole) { $warnings.Add("WARNING: ($cid) delik '$hid' capi $dd mm < min delik $minHole mm") }
+    if ($null -ne $minHole -and $dd -lt $minHole) { $warnings.Add("WARNING: ($cid) delik '$hid' capi $dd mm < min delik $minHole mm") }
     if ($h.status -eq "missing" -or $null -eq $h.center_x_mm -or $null -eq $h.center_y_mm) {
       if (-not ($hpOK -and $null -ne $h.placement)) { $errors.Add("($cid) delik '$hid': merkez kritik olcu eksik (status=missing) -> model olusturulamaz"); continue }
     }
