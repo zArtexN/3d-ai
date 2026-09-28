@@ -41,7 +41,16 @@ function Run-GVerify([hashtable]$VArgs) {
 }
 
 if (-not (Test-Path -LiteralPath $SpecFile)) { throw "Spec bulunamadi: $SpecFile" }
-$gspecObj = Get-Content -LiteralPath $SpecFile -Raw | ConvertFrom-Json
+. (Join-Path $EngineDir "CanonicalSpec.ps1")
+$rawSpec = Get-Content -LiteralPath $SpecFile -Raw | ConvertFrom-Json
+$preDivs = @(@($rawSpec.components) | Where-Object { $_ -and [string]$_.id -like "div*" }).Count
+$gspecObj = ConvertTo-CanonicalSpec $rawSpec
+$gateSpecFile = $SpecFile
+if ($preDivs -gt 0) {
+  # Eski format dogrudan verildiyse gate kanonik kopya uzerinden calisir (girdi dosyasi degismez).
+  $gateSpecFile = Join-Path ([System.IO.Path]::GetTempPath()) (([string]$gspecObj.project_name + "-canonical.json") -replace '[^A-Za-z0-9]+', '-')
+  $gspecObj | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $gateSpecFile -Encoding UTF8
+}
 $gsettings = Get-GSettings
 
 if ($ProjectDir -eq "") {
@@ -67,7 +76,7 @@ function Write-GValidation($dir, $name, $obj) {
 }
 
 # 1. Spec dogrulama
-$dvOut = & (Join-Path $EngineDir "Test-GeometrySpec.ps1") -SpecFile $SpecFile -Printer $printerPath -AsJson 2>&1
+  $dvOut = & (Join-Path $EngineDir "Test-GeometrySpec.ps1") -SpecFile $gateSpecFile -Printer $printerPath -AsJson 2>&1
 $dvCode = $LASTEXITCODE
 $dvTxt = $dvOut | Out-String
 $dv = $dvTxt | ConvertFrom-Json
@@ -139,7 +148,7 @@ foreach ($c in @($gspecObj.components)) {
 
     # --- hollow ---
     if ($null -ne $c.hollow) {
-      $hb = New-GHollowBox $ew $ed $hh ([double]$c.hollow.wall_mm) ([bool]$c.hollow.open_top)
+      $hb = New-GHollowBox $ew $ed $hh ([double]$c.hollow.wall_mm) ([bool]$c.hollow.open_top) $c.hollow.bottom_thickness_mm
       if (-not $hb.ok) { throw $hb.reason }
       $paramLines.Add("wall_thickness = " + (Format-Num ([double]$c.hollow.wall_mm)) + ";")
       $geo = $hb
@@ -175,6 +184,44 @@ foreach ($c in @($gspecObj.components)) {
     }
 
     $geo = Carve-G $geo $cuts.ToArray()
+
+    # --- govde-ici bolmeler (Adim A, spec 2.1): uzun kenar (X) boyunca esit aralikli paneller ---
+    # Turetim (tahmin degil): ic genislik iw = W-2*duvar; bosluk F = iw - adet*kalinlik;
+    # aralik g = F/(adet+1); x_i = duvar + g*i + kalinlik*(i-1);
+    # panel: kalinlik x ic_derinlik x (H-duvar-top_gap), taban z0 = duvar (bosluk tabani).
+    $divBoxes = New-Object System.Collections.Generic.List[object]
+    $dpat = $c.divider_pattern
+    if ($null -ne $dpat -and ($shape -eq "box" -or $shape -eq "rounded_box")) {
+      $dcn = 0; if ($null -ne $dpat.count) { $dcn = [int]$dpat.count }
+      $dth = 0; if ($null -ne $dpat.thickness_mm) { $dth = [double]$dpat.thickness_mm }
+      $dgap = 0; if ($null -ne $dpat.top_gap_mm) { $dgap = [double]$dpat.top_gap_mm }
+      if ($dcn -ge 1 -and $dth -gt 0 -and $ww -gt 0 -and $dd -gt 0 -and $hh -gt 0) {
+        $wl2 = 0
+        if ($null -ne $c.hollow -and $null -ne $c.hollow.wall_mm) { $wl2 = [double]$c.hollow.wall_mm }
+        $bt2 = $null
+        if ($null -ne $c.hollow) { $bt2 = $c.hollow.bottom_thickness_mm }
+        $iw2 = $ww - 2 * $wl2
+        $free = $iw2 - $dcn * $dth
+        if ($free -lt 0) { throw "divider_pattern sigmyor: 2*duvar + adet*kalinlik govde genisligini asiyor" }
+        $gg = $free / ($dcn + 1)
+        $id2 = $dd - 2 * $wl2
+        $z0 = Get-HollowFloor $wl2 $bt2
+        $dh = ($hh - $dgap) - $z0
+        if ($dh -le 0) { throw "divider_pattern: yukseklik kalmadi (top_gap cok buyuk)" }
+        $dgList = New-Object System.Collections.Generic.List[object]
+        for ($di = 1; $di -le $dcn; $di++) {
+          $x0 = $wl2 + $gg * $di + $dth * ($di - 1)
+          $gb = New-GBox $dth $id2 $dh
+          $gb = Move-G $gb $x0 $wl2 $z0
+          $dvName = ("divider_{0:000}" -f $di)
+          $paramLines.Add("divider_" + $di + "_x = " + (Format-Num $x0) + ";")
+          $paramLines.Add("divider_" + $di + "_w = " + (Format-Num $dth) + ";")
+          $dgList.Add($gb) | Out-Null
+          $divBoxes.Add([pscustomobject]@{ id = $dvName; bmin = @($gb.bmin); bmax = @($gb.bmax) }) | Out-Null
+        }
+        if ($dgList.Count -gt 0) { $geo = Merge-G(@(@($geo) + @($dgList.ToArray()))) }
+      }
+    }
 
     # --- kenar notlari (uygulanmaz, uyarilir) ---
     foreach ($e in @($c.edge_notes)) {
@@ -292,6 +339,20 @@ foreach ($c in @($gspecObj.components)) {
   })
   $partResults.Add([pscustomobject]@{ id = $cid; status = $partStatus; bbox_min = @($expMin); bbox_max = @($expMax) })
   Write-Output "GENGINE [$cid]: $partStatus (tur: $attempt)"
+  # Bolme dogrulamalari: ayri STL yok, geometri parent STL icinde (parent alani).
+  if ($null -ne $divBoxes) {
+    foreach ($db in $divBoxes) {
+      Write-GValidation $ProjectDir $db.id ([pscustomobject]@{
+        status = $partStatus; part = $db.id; parent = $cid
+        categories = [pscustomobject]@{ geometry = $geoCat; feature = $featCat; assembly = $asmCat; manufacturability = $mfgCat }
+        bbox_min = @($db.bmin); bbox_max = @($db.bmax)
+        file_bytes = $(if ($stlInfo) { $stlInfo.Length } else { 0 })
+        hole_checks = @(); retries = 0
+        detail_head = ("govde-ici bolme (parent " + $cid + ", STL: output/" + $cid + ".stl)")
+      })
+      $partResults.Add([pscustomobject]@{ id = $db.id; status = $partStatus; parent = $cid; bbox_min = @($db.bmin); bbox_max = @($db.bmax) })
+    }
+  }
 }
 
 # --- proje ozeti ---
@@ -301,11 +362,15 @@ foreach ($pr in $partResults) {
   elseif ($pr.status -eq "WARNING" -and $worstAll -eq "PASS") { $worstAll = "WARNING" }
 }
 $now = (Get-Date).ToUniversalTime().ToString("o")
+$dsVer = "2.0"
+foreach ($pc in @($gspecObj.components)) {
+  if ($pc -and $null -ne $pc.divider_pattern) { $dsVer = "2.1"; break }
+}
 $proj = [pscustomobject]@{
   project_id = [string]$gspecObj.project_name
   project_name = [string]$gspecObj.project_name
   created_at = $now; updated_at = $now; prompt = $gspecObj.prompt; status = $worstAll
-  designspec_version = "2.0"; engine_version = "V1.1"; pipeline_version = "V1.2"
+  designspec_version = $dsVer; engine_version = "V1.1"; pipeline_version = "V1.2"
   parts = @($partResults.ToArray()); validation_status = $worstAll; assembly = $gspecObj.assembly
   gcode_available = $false; gcode_note = "NOT AVAILABLE - printer profile required"
 }
@@ -328,7 +393,9 @@ $rm.Add("## Parcalar")
 $rm.Add("| Parca | Durum | bbox min | bbox max | STL |")
 $rm.Add("| ----- | ----- | -------- | -------- | --- |")
 foreach ($pr in $partResults) {
-  $rm.Add("| $($pr.id) | $($pr.status) | $($pr.bbox_min -join ', ') | $($pr.bbox_max -join ', ') | output/$($pr.id).stl |")
+  $stlRef = "output/" + $pr.id + ".stl"
+  if ($pr.parent) { $stlRef = "output/" + $pr.parent + ".stl (govde-ici)" }
+  $rm.Add("| $($pr.id) | $($pr.status) | $($pr.bbox_min -join ', ') | $($pr.bbox_max -join ', ') | $stlRef |")
 }
 $rm.Add("")
 $rm.Add("## Dogrulama")

@@ -127,6 +127,18 @@ $chk23 = {
 }
 Invoke-PipeCase "T23" "60x40x20 kutu, delik 12" @{ "body-hole-h1-center" = "20,20" } "PASS" $chk23
 
+# ---- T23b: acik govde olcusu -> soru yok, dogrudan PASS (160x100x45 bug repro) ----
+$chk23b = {
+  param($dir, $res)
+  $sp = Get-Content -LiteralPath (Join-Path $dir "spec.json") -Raw | ConvertFrom-Json
+  $b = $sp.components[0].base
+  $nq = 0; if ($res.questions) { $nq = @($res.questions).Count }
+  $s = Test-Path -LiteralPath (Join-Path $dir (Join-Path "output" "body.stl"))
+  $ok = ([double]$b.width_mm -eq 160 -and [double]$b.depth_mm -eq 100 -and [double]$b.height_mm -eq 45 -and $nq -eq 0 -and $s)
+  return @{ ok = $ok; detail = $(if ($ok) { "body 160/100/45, sorusuz PASS" } else { "body=$($b.width_mm),$($b.depth_mm),$($b.height_mm) nq=$nq stl=$s" }) }
+}
+Invoke-PipeCase "T23b" "160x100x45 mm kutu yap." $null "PASS" $chk23b
+
 # ---- T24/T25/T26: SCAD bolum + STL + kategoriler (T21 tekrarinda dogrula) ----
 $chk24 = {
   param($dir, $res)
@@ -263,26 +275,23 @@ Invoke-EngCase "T43" (New-Neg "T43" $m43) "BLOCKED" $null
 $m44 = { param($c) $c.tolerance = [pscustomobject]@{ type = "clearance_fit"; clearance_mm = -0.5; fit_to = $null; status = "ok" } }
 Invoke-EngCase "T44" (New-Neg "T44" $m44) "BLOCKED" $null
 
-# ---- TA: organizer full -> PASS 5 STL ----
-$sA = [pscustomobject]@{ project_name = "ta"; prompt = "ta"; metadata = [pscustomobject]@{ spec_version = "2.0" }; assembly = $null; material = $null; components = @() }
+# ---- TA: organizer full -> PASS 3 STL (bolmeler body icinde; ayri div STL yok) ----
+$sA = [pscustomobject]@{ project_name = "ta"; prompt = "ta"; metadata = [pscustomobject]@{ spec_version = "2.1" }; assembly = $null; material = $null; components = @() }
 $ca = New-V2Comp "body" "box"
 $ca.base.width_mm = 120; $ca.base.depth_mm = 80; $ca.base.height_mm = 60
 $ca.hollow = [pscustomobject]@{ wall_mm = 2.5; open_top = $true }
-$d1 = New-V2Comp "div1" "box"
-$d1.base.width_mm = 50; $d1.base.depth_mm = 70; $d1.base.height_mm = 40
-$d2 = New-V2Comp "div2" "box"
-$d2.base.width_mm = 30; $d2.base.depth_mm = 70; $d2.base.height_mm = 40
+$ca | Add-Member -NotePropertyName "divider_pattern" -NotePropertyValue ([pscustomobject]@{ count = 2; thickness_mm = 2; top_gap_mm = 0; orientation = "along_length"; status = "ok" }) -Force
 $ba = New-V2Comp "base" "box"
 $ba.base.width_mm = 120; $ba.base.depth_mm = 80; $ba.base.height_mm = 5
 $la = New-V2Comp "lid" "box"
 $la.base.width_mm = 120; $la.base.depth_mm = 80; $la.base.height_mm = 6
 $la.tolerance = [pscustomobject]@{ type = "clearance_fit"; clearance_mm = 0.2; fit_to = "body"; status = "ok" }
-$sA.components = @($ca, $d1, $d2, $ba, $la)
-$sA.assembly = [pscustomobject]@{ parts = @("body", "div1", "div2", "base", "lid"); joints = @([pscustomobject]@{ id = "j1"; type = "sliding_fit"; part_a = "body"; part_b = "lid"; clearance_mm = 0.2; screw = $null }) }
+$sA.components = @($ca, $ba, $la)
+$sA.assembly = [pscustomobject]@{ parts = @("body", "base", "lid"); joints = @([pscustomobject]@{ id = "j1"; type = "sliding_fit"; part_a = "body"; part_b = "lid"; clearance_mm = 0.2; screw = $null }) }
 $chkA = {
   param($info)
-  $ok = ($info.stls.Count -eq 5)
-  return @{ ok = $ok; detail = $(if ($ok) { "5 parca STL" } else { "stl=$($info.stls.Count)" }) }
+  $ok = ($info.stls.Count -eq 3)
+  return @{ ok = $ok; detail = $(if ($ok) { "3 parca STL (body+base+lid)" } else { "stl=$($info.stls.Count)" }) }
 }
 Invoke-EngCase "TA" $sA "PASS" $chkA
 

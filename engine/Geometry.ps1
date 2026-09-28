@@ -126,23 +126,34 @@ function New-GCutout($face, $px, $py, $w, $l, $depth, $bodyW, $bodyD, $bodyH) {
   } elseif ($face -eq "front") {
     $s = "translate([" + (Format-Num $px) + ", -1, " + (Format-Num $py) + "]) cube([" + (Format-Num $w) + ", " + (Format-Num ([double]$depth + 1)) + ", " + (Format-Num $l) + "]);"
     return (New-GObj "cutout" $s @([double]$px, 0, [double]$py) @(([double]$px + [double]$w), [double]$depth, ([double]$py + [double]$l)) $null)
-  } else { throw "geometry: kesik yuzu top/front olmali" }
+  } elseif ($face -eq "rear") {
+    $s = "translate([" + (Format-Num $px) + ", " + (Format-Num ([double]$bodyD - [double]$depth)) + ", " + (Format-Num $py) + "]) cube([" + (Format-Num $w) + ", " + (Format-Num ([double]$depth + 1)) + ", " + (Format-Num $l) + "]);"
+    return (New-GObj "cutout" $s @([double]$px, ([double]$bodyD - [double]$depth), [double]$py) @(([double]$px + [double]$w), [double]$bodyD, ([double]$py + [double]$l)) $null)
+  } else { throw "geometry: kesik yuzu top/front/rear olmali" }
 }
 
 # ---- hollow / shell (§5): ok=$false ise geometrik olarak imkansiz ----
-function New-GHollowBox($w, $d, $h, $wall, $openTop) {
+# Taban kurali: floor = bottom ?? wall (kullanicinin degeri sessizce yok sayilmaz).
+function Get-HollowFloor($wall, $bottom) {
+  $fl = [double]$wall
+  if ($null -ne $bottom -and [double]$bottom -gt 0) { $fl = [double]$bottom }
+  return $fl
+}
+function New-GHollowBox($w, $d, $h, $wall, $openTop, $floor) {
   Assert-Pos "width" $w; Assert-Pos "depth" $d; Assert-Pos "height" $h; Assert-Pos "wall" $wall
   $ww = [double]$wall
-  if (2 * $ww -ge [double]$w -or 2 * $ww -ge [double]$d -or $ww -ge [double]$h) {
-    return [pscustomobject]@{ ok = $false; reason = "ici bos govde imkansiz: 2*duvar en/kal boyutu geciyor (duvar $ww, govde ${w}x${d}x${h})" }
+  $fl = Get-HollowFloor $wall $floor
+  if (2 * $ww -ge [double]$w -or 2 * $ww -ge [double]$d -or $ww -ge [double]$h -or $fl -ge [double]$h) {
+    return [pscustomobject]@{ ok = $false; reason = "ici bos govde imkansiz: 2*duvar en/kal boyutu geciyor ya da taban yuksekligi asiyor (duvar $ww taban $fl, govde ${w}x${d}x${h})" }
   }
   $iw = Format-Num ([double]$w - 2 * $ww); $id2 = Format-Num ([double]$d - 2 * $ww)
+  $flS = Format-Num $fl
   if ($openTop) {
-    $ih = Format-Num ([double]$h - $ww + 1)
-    $s = "difference() { cube([" + (Format-Num $w) + ", " + (Format-Num $d) + ", " + (Format-Num $h) + "]); translate([" + (Format-Num $ww) + ", " + (Format-Num $ww) + ", " + (Format-Num $ww) + "]) cube([" + $iw + ", " + $id2 + ", " + $ih + "]); }"
+    $ih = Format-Num ([double]$h - $fl + 1)
+    $s = "difference() { cube([" + (Format-Num $w) + ", " + (Format-Num $d) + ", " + (Format-Num $h) + "]); translate([" + (Format-Num $ww) + ", " + (Format-Num $ww) + ", " + $flS + "]) cube([" + $iw + ", " + $id2 + ", " + $ih + "]); }"
   } else {
-    $ih = Format-Num ([double]$h - 2 * $ww)
-    $s = "difference() { cube([" + (Format-Num $w) + ", " + (Format-Num $d) + ", " + (Format-Num $h) + "]); translate([" + (Format-Num $ww) + ", " + (Format-Num $ww) + ", " + (Format-Num $ww) + "]) cube([" + $iw + ", " + $id2 + ", " + $ih + "]); }"
+    $ih = Format-Num ([double]$h - $ww - $fl)
+    $s = "difference() { cube([" + (Format-Num $w) + ", " + (Format-Num $d) + ", " + (Format-Num $h) + "]); translate([" + (Format-Num $ww) + ", " + (Format-Num $ww) + ", " + $flS + "]) cube([" + $iw + ", " + $id2 + ", " + $ih + "]); }"
   }
   $g = New-GObj "hollow_box" $s @(0, 0, 0) @([double]$w, [double]$d, [double]$h) $null
   $g | Add-Member -NotePropertyName "ok" $true

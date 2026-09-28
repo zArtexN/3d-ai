@@ -58,10 +58,14 @@ try {
   if (-not ([double]$b.hollow.bottom_thickness_mm -eq 3)) { $chk.Add("bottom") }
   $fil = @($b.edge_notes | Where-Object { $_.kind -eq "fillet" } | Select-Object -First 1)
   if (-not ([double]$fil[0].value_mm -eq 5)) { $chk.Add("radius") }
+  # Adim A: bolmeler body.divider_pattern'de; bagimsiz div component yok (2.1).
   $divs = @($g.spec.components | Where-Object { $_.id -like "div*" })
-  if (-not ($divs.Count -eq 2)) { $chk.Add("divcount") }
-  if (-not ([double]$divs[0].thickness_mm -eq 2 -and [double]$divs[1].thickness_mm -eq 2)) { $chk.Add("divth") }
-  if (-not ([double]$divs[0].top_gap_mm -eq 5)) { $chk.Add("divgap") }
+  if ($divs.Count -gt 0) { $chk.Add("nodivsupposed") }
+  $dp0 = @($g.spec.components | Where-Object { $_.id -eq "body" })[0].divider_pattern
+  if (-not ([int]$dp0.count -eq 2)) { $chk.Add("divcount") }
+  if (-not ([double]$dp0.thickness_mm -eq 2)) { $chk.Add("divth") }
+  if (-not ([double]$dp0.top_gap_mm -eq 5)) { $chk.Add("divgap") }
+  if (-not ([string]$g.spec.metadata.spec_version -eq "2.1")) { $chk.Add("specver") }
   $c = $b.cutouts[0]
   if (-not ([double]$c.width_mm -eq 20 -and [double]$c.length_mm -eq 10)) { $chk.Add("cutsize") }
   if (-not ([string]$c.placement.edge -eq "rear_short_edge" -and [string]$c.placement.horizontal -eq "center")) { $chk.Add("cutedge") }
@@ -84,7 +88,7 @@ try {
   if (-not ($mp.Count -eq 4)) { $chk.Add("mounting") }
   $lidHere = @($g.spec.components | Where-Object { $_.id -eq "lid" })
   if ($lidHere.Count -gt 0) { $chk.Add("nolidsupposed") }
-  $forbid = @("body.dims", "body-hollow_top", "body-hole-h1-dia", "body-hole-h2-dia", "body-hole-h3-dia", "body-hole-h4-dia", "body-cutout-c1")
+  $forbid = @("body.dims", "body-hollow_top", "body-hole-h1-dia", "body-hole-h2-dia", "body-hole-h3-dia", "body-hole-h4-dia", "body-cutout-c1", "div1-dims", "div2-dims", "body-divider_pattern-thickness")
   foreach ($fid in $forbid) {
     if (@($g.qs | Where-Object { $_.question_id -eq $fid }).Count -gt 0) { $chk.Add("reask:" + $fid) }
   }
@@ -271,7 +275,7 @@ try {
   $oTxt = & $Pipeline -Prompt $gPrompt -ProjectName "golden13" -ProjectDir $pd 2>&1 | Out-String
   $o = $oTxt | ConvertFrom-Json
   $qids = @(@($o.questions) | ForEach-Object { [string]$_.question_id })
-  $bad = @($qids | Where-Object { $_ -eq "body-dims" -or $_ -eq "body-hollow_top" -or $_ -eq "body-cutout-c1" -or ($_ -like "body-hole-h?-dia" -and $_ -notlike "body-hole-mp*") })
+  $bad = @($qids | Where-Object { $_ -eq "body-dims" -or $_ -eq "body-hollow_top" -or $_ -eq "body-cutout-c1" -or $_ -eq "body-divider_pattern-thickness" -or ($_ -like "body-hole-h?-dia" -and $_ -notlike "body-hole-mp*") })
   $trOk = Test-Path -LiteralPath (Join-Path $pd (Join-Path "logs" "pipeline-trace.json"))
   $fxOk = Test-Path -LiteralPath (Join-Path $pd "explicit-facts.json")
   $gcodeOk = ($o.gcode_available -eq $false)

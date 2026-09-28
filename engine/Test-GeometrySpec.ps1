@@ -18,8 +18,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "CanonicalSpec.ps1")
 if (-not (Test-Path -LiteralPath $SpecFile)) { throw "Spec bulunamadi: $SpecFile" }
-$gspecObj = Get-Content -LiteralPath $SpecFile -Raw | ConvertFrom-Json
+$gspecObj = ConvertTo-CanonicalSpec (Get-Content -LiteralPath $SpecFile -Raw | ConvertFrom-Json)
 
 $errors = New-Object System.Collections.Generic.List[string]
 $warnings = New-Object System.Collections.Generic.List[string]
@@ -79,9 +80,26 @@ foreach ($c in @($gspecObj.components)) {
       $errors.Add("($cid) hollow imkansiz: duvar $wl govdeye sigmyor (FAIL)")
     }
     if ($null -eq $c.hollow.open_top) { $errors.Add("($cid) hollow.open_top belirtilmemis (ustu acik mi?) -> model olusturulamaz") }
+    if ($null -ne $c.hollow.bottom_thickness_mm -and $bh -gt 0 -and [double]$c.hollow.bottom_thickness_mm -ge $bh) { $errors.Add("($cid) hollow.bottom_thickness_mm govde yuksekligini asiyor -> model olusturulamaz") }
     if ($null -ne $wl -and [double]$wl -gt 0 -and [double]$wl -lt $minWall) {
       $warnings.Add("WARNING: ($cid) duvar $wl mm < limit $minWall mm; deger korundu")
     }
+  }
+
+  # Adim A: govde-ici bolme geciidi (sayi + kalinlik + sigima).
+  $dpat = $c.divider_pattern
+  if ($null -ne $dpat) {
+    $dc = 0
+    if ($null -ne $dpat.count) { $dc = [int]$dpat.count }
+    if ($shape -ne "box" -and $shape -ne "rounded_box") { $errors.Add("($cid) divider_pattern yalnizca box/rounded_box tabanda desteklenir") }
+    elseif ($dc -lt 1) { $errors.Add("($cid) divider_pattern.count pozitif olmali (mevcut: $($dpat.count))") }
+    elseif ($null -eq $dpat.thickness_mm -or [double]$dpat.thickness_mm -le 0) { $errors.Add("($cid) divider_pattern.thickness_mm kritik olcu eksik/gecersiz -> model olusturulamaz") }
+    elseif (($shape -eq "box" -or $shape -eq "rounded_box") -and $bw -gt 0) {
+      $wl2 = 0
+      if ($null -ne $c.hollow -and $null -ne $c.hollow.wall_mm) { $wl2 = [double]$c.hollow.wall_mm }
+      if ((2 * $wl2 + $dc * [double]$dpat.thickness_mm) -gt $bw) { $errors.Add("($cid) divider_pattern sigmyor: 2*duvar + adet*kalinlik govde genisligini asiyor -> model olusturulamaz") }
+    }
+    if ($null -ne $dpat.top_gap_mm -and [double]$dpat.top_gap_mm -lt 0) { $errors.Add("($cid) divider_pattern.top_gap_mm negatif olamaz") }
   }
 
   foreach ($h in @($c.holes)) {
@@ -122,11 +140,11 @@ foreach ($c in @($gspecObj.components)) {
         if ([double]$t.pos_x_mm -lt 0 -or [double]$t.pos_y_mm -lt 0 -or ([double]$t.pos_x_mm + [double]$t.width_mm) -gt $bw -or ([double]$t.pos_y_mm + [double]$t.length_mm) -gt $bd -or [double]$t.depth_mm -gt $bh) {
           $errors.Add("($cid) kesik '$tid': govde disina tasiyor")
         }
-      } elseif ($t.face -eq "front") {
+      } elseif ($t.face -eq "front" -or $t.face -eq "rear") {
         if ([double]$t.pos_x_mm -lt 0 -or ([double]$t.pos_x_mm + [double]$t.width_mm) -gt $bw -or [double]$t.pos_y_mm -lt 0 -or ([double]$t.pos_y_mm + [double]$t.length_mm) -gt $bh -or [double]$t.depth_mm -gt $bd) {
           $errors.Add("($cid) kesik '$tid': govde disina tasiyor")
         }
-      } else { $errors.Add("($cid) kesik '$tid': yuz top/front olmali") }
+      } else { $errors.Add("($cid) kesik '$tid': yuz top/front/rear olmali") }
     }
   }
 

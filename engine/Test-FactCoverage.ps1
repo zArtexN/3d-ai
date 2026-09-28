@@ -19,6 +19,7 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
+. (Join-Path $PSScriptRoot "CanonicalSpec.ps1")
 function Load-Json($p) {
   if (-not (Test-Path -LiteralPath $p)) { return $null }
   try { return (Get-Content -LiteralPath $p -Raw | ConvertFrom-Json) } catch { return $null }
@@ -27,7 +28,7 @@ function Num-Eq($a, $b) {
   try { return ([Math]::Abs([double]$a - [double]$b) -lt 0.0001) } catch { return ([string]$a -eq [string]$b) }
 }
 
-$spec = Load-Json $SpecFile
+$spec = ConvertTo-CanonicalSpec (Load-Json $SpecFile)
 $ff = Load-Json $FactsFile
 $facts = @()
 if ($null -ne $ff) {
@@ -89,11 +90,20 @@ foreach ($f in $facts) {
       if ($p -eq "horizontal" -and [string]$v -eq "center" -and $null -ne $t1.placement -and [string]$t1.placement.type -eq "edge_centered") { $ok = $true }
     }
   } elseif ($t -eq "dividers") {
-    $divs = @()
-    if ($null -ne $spec) { $divs = @(@($spec.components) | Where-Object { $_ -and [string]$_.id -like "div*" }) }
-    if ($p -eq "count" -and $divs.Count -eq [int]$v) { $ok = $true }
-    if ($p -eq "thickness_mm") { $all = $true; foreach ($d in $divs) { if (-not (Num-Eq $d.thickness_mm $v)) { $all = $false } }; if ($all -and $divs.Count -gt 0) { $ok = $true } }
-    if ($p -eq "top_gap_mm") { $all = $true; foreach ($d in $divs) { if (-not (Num-Eq $d.top_gap_mm $v)) { $all = $false } }; if ($all -and $divs.Count -gt 0) { $ok = $true } }
+    $b0 = Get-Comp "body"
+    $pat = $null
+    if ($null -ne $b0) { $pat = $b0.divider_pattern }
+    if ($null -ne $pat) {
+      if ($p -eq "count" -and [int]$pat.count -eq [int]$v) { $ok = $true }
+      if ($p -eq "thickness_mm" -and (Num-Eq $pat.thickness_mm $v)) { $ok = $true }
+      if ($p -eq "top_gap_mm" -and (Num-Eq $pat.top_gap_mm $v)) { $ok = $true }
+    } else {
+      $divs = @()
+      if ($null -ne $spec) { $divs = @(@($spec.components) | Where-Object { $_ -and [string]$_.id -like "div*" }) }
+      if ($p -eq "count" -and $divs.Count -eq [int]$v) { $ok = $true }
+      if ($p -eq "thickness_mm") { $all = $true; foreach ($d in $divs) { if (-not (Num-Eq $d.thickness_mm $v)) { $all = $false } }; if ($all -and $divs.Count -gt 0) { $ok = $true } }
+      if ($p -eq "top_gap_mm") { $all = $true; foreach ($d in $divs) { if (-not (Num-Eq $d.top_gap_mm $v)) { $all = $false } }; if ($all -and $divs.Count -gt 0) { $ok = $true } }
+    }
   } elseif ($t -eq "mounting") {
     $b = Get-Comp "body"
     $mps = @()
@@ -200,6 +210,7 @@ foreach ($q in $qs) {
     }
   } elseif ($kind -eq "wall" -and $null -ne $c -and $null -ne $c.hollow -and $null -ne $c.hollow.wall_mm) { $isResolved = $true }
   elseif ($kind -eq "lid_height" -and $null -ne $c -and $null -ne $c.base -and $null -ne $c.base.height_mm) { $isResolved = $true }
+  elseif ($kind -eq "divider_thickness" -and $null -ne $c -and $null -ne $c.divider_pattern -and $null -ne $c.divider_pattern.thickness_mm) { $isResolved = $true }
   elseif (($kind -eq "clearance" -or $kind -eq "joint_clearance") -and $null -ne $c -and $null -ne $c.tolerance -and $null -ne $c.tolerance.clearance_mm) { $isResolved = $true }
   elseif (($kind -eq "rotate_axis" -and $null -eq $c.pending_rotate) -or ($kind -eq "mirror_axis" -and $c.pending_mirror -ne $true)) { $isResolved = $true }
   elseif ($kind -eq "edge_value") {

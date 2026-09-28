@@ -61,7 +61,21 @@ SORU/CEVAP GECMISI panelinde saklanir.
    Secim `settings.local.json` dosyasina kaydolur (bu dosya Git'e gitmez).
 4. FreeCAD/OrcaSlicer yoksa sorun degil (OPTIONAL); CAD/STL calisir.
 
+## Soylemen yeterli, tekrar sormaz
+- `160x100x45 mm` -> govde olcusu otomatik (160, 100, 45).
+- `ustu acik` / `ustten acik` / `kapaksiz` -> ust acik sayilir, tekrar sorulmaz.
+- `4 adet O4.2 mm gecisli vida deligi, kenarlardan 8 mm` -> 4 delik cap 4.2 olarak acilir; koselerdeyse dort koseye otomatik yerlesir.
+- `2 adet bolme, bolme kalinligi 2 mm` -> bolmeler ve kalinlik otomatik.
+- `5 mm yaricap`, `1 mm pah`, `20x10 mm kablo acikligi` -> otomatik.
+- `biraz gevsek` / `saglam olsun` gibi belirsiz ifadelerde program DEGER UYDURMAZ, net sayi sorar.
+
+## Bilinen sinirlamalar
+- `ayri`, `cikarilabilir` veya `bagimsiz bolme` yazsan da bolmeler govde-ici panel olarak uretilir (body.divider_pattern); ayri parca STL verilmez. Cikarilabilir bolme destegi sonraki faz.
+- `taban` kalinligi verildiginde govde tabani o kalinlikta kurulur (duvar kalinligindan farkli olabilir); bolmeler taban ustune oturur.
+
 ## Dikkat edilecekler
 - Olculeri tam yaz (ornek: deligin nerede olacagi). Eksik olcuyu program UYDURMAZ, sorar.
-- G-code (yazici dosyasi) butonu YOK. O is sonraki asamada eklenecek.
+- G-code (yazici dosyasi) butonu YOK. Gercek yazici+filament profili eklenmeden slicing yapilmaz.
 - Duvar cok inceyse program UYARI verir ama senin olcunu degistirmez.
+- EXE acikken yeniden build calistirma: once uygulamayi kapat (build kilitliyse BLOCKED yazar).
+- Yazici/filament eklemeden sicaklik/hiz/nozzle degeri gostermez; UNKNOWN yazar.

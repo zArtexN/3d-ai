@@ -16,8 +16,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "CanonicalSpec.ps1")
 if (-not (Test-Path -LiteralPath $SpecFile)) { throw "Spec bulunamadi: $SpecFile" }
-$qspecObj = Get-Content -LiteralPath $SpecFile -Raw | ConvertFrom-Json
+$qspecObj = ConvertTo-CanonicalSpec (Get-Content -LiteralPath $SpecFile -Raw | ConvertFrom-Json)
 
 $qlist = New-Object System.Collections.Generic.List[object]
 function Add-Q($comp, $field, $target, $kind, $q, $reason) {
@@ -88,8 +89,23 @@ if ($comps.Count -eq 0 -or ($comps.Count -eq 1 -and $null -eq $comps[0])) {
     foreach ($t in @($c.cutouts)) {
       if ($null -eq $t) { continue }
       $tid = [string]$t.id
-      if ($t.status -eq "missing" -or $null -eq $t.pos_x_mm -or $null -eq $t.pos_y_mm -or $null -eq $t.width_mm -or $null -eq $t.length_mm -or $null -eq $t.depth_mm) {
-        Add-Q $cid ("cutouts." + $tid) ($cid + ".cutout." + $tid) "cutout" ("Kesik '" + $tid + "' olcu/konum/derinlik nedir? Ornek: 20x10, konum 5,5, derinlik 8.") "konumsuz kesik cikarilamaz"
+      $depthNeed = ($null -eq $t.depth_mm -and [string]$t.penetration -ne "through_wall")
+      if ($t.status -eq "missing" -or $null -eq $t.pos_x_mm -or $null -eq $t.pos_y_mm -or $null -eq $t.width_mm -or $null -eq $t.length_mm -or $depthNeed) {
+        # Kompozit soru YOK: yalnizca gercekten eksik property'ler listelenir, bilinenler korunur.
+        $miss = New-Object System.Collections.Generic.List[string]
+        if ($null -eq $t.width_mm -or $null -eq $t.length_mm) { $miss.Add("olcu (ornek: 20x10 mm)") }
+        if ($null -eq $t.pos_x_mm) { $miss.Add("yatay konum (tek sayi, ornek: 70)") }
+        if ($null -eq $t.pos_y_mm) { $miss.Add("dikey konum (ornek: alttan 12)") }
+        if ($depthNeed) { $miss.Add("derinlik (ornek: derinlik 8)") }
+        $known = New-Object System.Collections.Generic.List[string]
+        if ($null -ne $t.width_mm -and $null -ne $t.length_mm) { $known.Add(("olcu " + [string]$t.width_mm + "x" + [string]$t.length_mm)) }
+        if ($null -ne $t.pos_x_mm) { $known.Add(("yatay " + [string]$t.pos_x_mm)) }
+        if ($null -ne $t.pos_y_mm) { $known.Add(("dikey alttan " + [string]$t.pos_y_mm)) }
+        if ([string]$t.penetration -eq "through_wall") { $known.Add("derinlik duvar-kalınlığı (through_wall)") }
+        elseif ($null -ne $t.depth_mm) { $known.Add(("derinlik " + [string]$t.depth_mm)) }
+        $qtext = ("Kesik '" + $tid + "' eksikleri: " + ($miss -join "; ") + ".")
+        if ($known.Count -gt 0) { $qtext += (" Bildirilenler korunur: " + ($known -join ", ") + ".") }
+        Add-Q $cid ("cutouts." + $tid) ($cid + ".cutout." + $tid) "cutout" $qtext "eksik konum/olcu olmadan kesik cikarilamaz"
       }
     }
     $tol = $c.tolerance
@@ -100,6 +116,11 @@ if ($comps.Count -eq 0 -or ($comps.Count -eq 1 -and $null -eq $comps[0])) {
       if ($e -and $null -eq $e.value_mm) {
         Add-Q $cid ("edge." + [string]$e.kind) ($cid + ".edge." + [string]$e.kind) "edge_value" ("Kenar islemi (" + [string]$e.kind + ") olcusu kac mm? Ornek: 3.") "olcusuz kenar islemi uygulanamaz"
       }
+    }
+    # Adim A: govde-ici bolme tek soru (dis olcu sorulmaz; kalinlik kritik).
+    $dpat = $c.divider_pattern
+    if ($null -ne $dpat -and ($null -eq $dpat.thickness_mm -or [string]$dpat.status -eq "missing")) {
+      Add-Q $cid "divider_pattern.thickness_mm" ($cid + ".divider_pattern.thickness") "divider_thickness" "Bolme kalinligi kac mm? (ornek: 2)" "bolme kalinligi olmadan ic bolme uretilemez; deger uydurulamaz"
     }
   }
 }
@@ -119,8 +140,19 @@ if ($null -ne $asm) {
 }
 
 $arr = @($qlist.ToArray() | Where-Object { $_ -ne $null })
+# Oncelik (stabil siralama): geometri/topoloji bloklayanlar once, fit/tolerans sonra.
+$priorityByKind = @{
+  dims = 1; hole_dia = 1; hole_center = 1; hole_depth = 1; hole_extra = 1
+  hollow_top = 1; cutout = 1; lid_height = 1; rotate_axis = 1; mirror_axis = 1; edge_value = 1
+  divider_thickness = 1
+  wall = 2; clearance = 2; joint_clearance = 2
+}
+$order = 0
+foreach ($q in $arr) { $q | Add-Member -NotePropertyName "_seq" -NotePropertyValue $order -Force; $order++ }
+$arr = @($arr | Sort-Object -Property @{ Expression = { $pr = 3; if ($priorityByKind.ContainsKey([string]$_.kind)) { $pr = $priorityByKind[[string]$_.kind] }; $pr } }, @{ Expression = { [int]($_."_seq") } })
+foreach ($q in $arr) { $q.PSObject.Properties.Remove("_seq") }
 $parserByKind = @{
-  dims = "length"; lid_height = "length"; wall = "length"
+  dims = "length"; lid_height = "length"; wall = "length"; divider_thickness = "length"
   hole_center = "center"; hole_dia = "length"; hole_depth = "length"; hole_extra = "length"
   cutout = "length"; clearance = "length"; joint_clearance = "length"
   hollow_top = "open_top"; rotate_axis = "axis"; mirror_axis = "axis"; edge_value = "length"
@@ -133,6 +165,9 @@ foreach ($q in $arr) {
   if ($parserByKind.ContainsKey([string]$q.kind)) { $pk = $parserByKind[[string]$q.kind] }
   $q | Add-Member -NotePropertyName "parser" -NotePropertyValue $pk -Force
   $q | Add-Member -NotePropertyName "required" -NotePropertyValue $true -Force
+  $pr2 = 3
+  if ($priorityByKind.ContainsKey([string]$q.kind)) { $pr2 = $priorityByKind[[string]$q.kind] }
+  $q | Add-Member -NotePropertyName "priority" -NotePropertyValue $pr2 -Force
 }
 if ($AsJson) {
   if ($arr.Count -eq 0) { "[]" }

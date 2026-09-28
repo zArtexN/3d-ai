@@ -91,6 +91,48 @@ $providerName = [string]$ai.provider
 Write-PLog $ProjectDir "parser.log" ("AI-OK provider=" + $providerName + " spec=spec.json")
 }
 
+# 1a. Kanonik model (Adim A, spec 2.1): eski div* component'ler divider_pattern'e
+# katlanir ve dosyaya geri yazilir (sonraki asamalara kanonik spec girer).
+. (Join-Path $EngineDir "CanonicalSpec.ps1")
+try {
+  $canonSpec = ConvertTo-CanonicalSpec (Get-Content -LiteralPath $specPath -Raw | ConvertFrom-Json)
+  $canonSpec | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $specPath -Encoding UTF8
+  Write-PLog $ProjectDir "parser.log" "CANONICAL spec=spec.json"
+} catch {
+  Write-PLog $ProjectDir "parser.log" ("CANONICAL-FAIL " + $_.Exception.Message)
+}
+
+# Stale tespiti (uyari; silme YOK, kullanici dosyalarina dokunulmaz):
+# spec'te olmayan div* uretim dosyalari (eski model kalintisi) raporlanir.
+$staleList = New-Object System.Collections.Generic.List[string]
+try {
+  $specIds = @(@($canonSpec.components) | Where-Object { $_ -ne $null } | ForEach-Object { [string]$_.id })
+  $specDivN = 0
+  $specBody = @(@($canonSpec.components) | Where-Object { $_ -and [string]$_.id -eq "body" })
+  if ($specBody.Count -gt 0 -and $null -ne $specBody[0].divider_pattern -and $null -ne $specBody[0].divider_pattern.count) {
+    $specDivN = [int]$specBody[0].divider_pattern.count
+  }
+  foreach ($sd in @(@{ d = "output"; f = "*.stl" }, @{ d = "cad"; f = "*.scad" }, @{ d = "validation"; f = "*.validation.json" })) {
+    $dd = Join-Path $ProjectDir $sd.d
+    if (-not (Test-Path -LiteralPath $dd)) { continue }
+    foreach ($fl in (Get-ChildItem -LiteralPath $dd -Filter $sd.f -ErrorAction SilentlyContinue)) {
+      $bn = [string]$fl.BaseName -replace '\.validation$', ''
+      if ($bn -like "divider_*") {
+        # Yeni model urunu: pattern yoksa ya da numarasi adedi asiyorsa stale.
+        $dm = [regex]::Match($bn, 'divider_(\d+)$')
+        $dn = 0
+        if ($dm.Success) { $dn = [int]$dm.Groups[1].Value }
+        if ($specDivN -eq 0 -or $dn -gt $specDivN -or $dn -lt 1) { $staleList.Add(($sd.d + "/" + $fl.Name)) | Out-Null }
+      } elseif ($bn -like "div*" -and $specIds -notcontains $bn) {
+        $staleList.Add(($sd.d + "/" + $fl.Name)) | Out-Null
+      }
+    }
+  }
+  if ($staleList.Count -gt 0) { Write-PLog $ProjectDir "parser.log" ("STALE " + ($staleList -join "; ")) }
+} catch {
+  Write-PLog $ProjectDir "parser.log" ("STALE-FAIL " + $_.Exception.Message)
+}
+
 # 1b. Explicit-fact ledger + trace (bilgi-kaybi mimarisi: parse asamasinda fact'ler cikarilir).
 $factsPath = Join-Path $ProjectDir "explicit-facts.json"
 $mentionsPath = Join-Path $ProjectDir "explicit-mentions.json"
@@ -270,6 +312,7 @@ if ($gateErrors.Count -gt 0) {
     reason = $gateReason
     errors = @($gateErrors.ToArray()); questions = @($qsNow)
     parts = @(); gcode_available = $false
+    stale_artifacts = @($staleList.ToArray())
   }) 3
 }
 
@@ -307,5 +350,6 @@ Write-PResult ([pscustomobject]@{
   status = $finalStatus; stage = "done"; provider = $providerName
   reason = $(if ($finalStatus -eq "PASS" -or $finalStatus -eq "WARNING") { "proje tamamlandi" } else { "uretim basarisiz; detay validation dosyalari" })
   questions = @(); parts = @($parts.ToArray()); gcode_available = $false
+  stale_artifacts = @($staleList.ToArray())
   gcode_note = "NOT AVAILABLE - printer profile required"
 }) $(if ($finalStatus -eq "PASS" -or $finalStatus -eq "WARNING") { 0 } else { 2 })

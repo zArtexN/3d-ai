@@ -18,9 +18,22 @@ function Parse-Pair($t) {
   return @((Get-NumU $m.Groups[1].Value), (Get-NumU $m.Groups[2].Value))
 }
 function Parse-Triple($t) {
-  $m = [regex]::Match($t, '(-?\d+(?:[.,]\d+)?)\s*[xX\u00d7]\s*(-?\d+(?:[.,]\d+)?)\s*[xX\u00d7]\s*(-?\d+(?:[.,]\d+)?)')
-  if (-not $m.Success) { throw "Cevap anlasilmadi. Uc olcu bekleniyor (ornek: 80x40x20). Girilen: $t" }
-  return @((Get-NumU $m.Groups[1].Value), (Get-NumU $m.Groups[2].Value), (Get-NumU $m.Groups[3].Value))
+  # Govde olcusu cevabi: "160x100x45" kesin kabul; ayrica x/X/* ve U+00D7/U+2715/U+2716/U+2A2F
+  # ayiraclari, sayi-arasi "mm" ("160mm x 100mm x 45mm") ve tum-cevap virgul/noktali-virgul/
+  # bosluk uculeri ("160, 100, 45" / "160 100 45") kabul edilir. Uc sayi da pozitif olmali.
+  $s = [string]$t
+  $s = $s -replace '[\u2715\u2716\u2a2f\u00d7\*]', 'x'
+  $s = $s -replace '(?i)[c\u00e7]arp[i\u0131]', 'x'
+  $s = $s -replace '(?i)(?<=\d)\s*mm\b|\bmm\b', ' '
+  $s = [regex]::Replace($s, '(-?\d+(?:[.,]\d+)?)\s*cm\b', { param($m) ((Get-NumU $m.Groups[1].Value) * 10).ToString() } )
+  $m = [regex]::Match($s, '(-?\d+(?:[.,]\d+)?)\s*[xX]\s*(-?\d+(?:[.,]\d+)?)\s*[xX]\s*(-?\d+(?:[.,]\d+)?)')
+  if (-not $m.Success) {
+    $m = [regex]::Match($s.Trim(), '^(-?\d+(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d+(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d+(?:[.,]\d+)?)$')
+  }
+  if (-not $m.Success) { throw "Govde olcusu anlasilmadi. Uc pozitif olcu bekleniyor (ornek: 80x40x20 veya '80, 40, 20'). Girilen: $t" }
+  $d = @((Get-NumU $m.Groups[1].Value), (Get-NumU $m.Groups[2].Value), (Get-NumU $m.Groups[3].Value))
+  if ($d[0] -le 0 -or $d[1] -le 0 -or $d[2] -le 0) { throw "Olculer pozitif olmali (ornek: 80x40x20). Girilen: $t" }
+  return $d
 }
 function Parse-One($t) {
   $m = [regex]::Match($t, '(-?\d+(?:[.,]\d+)?)')
@@ -40,7 +53,7 @@ function Parse-Center($t, $bw, $bd) {
   $s = $s.Trim()
   if ($s -eq "") { throw "Cevap anlasilmadi. Iki sayi bekleniyor (ornek: 15,15 veya 15 15). Girilen: $t" }
   if ($s -match '^\s*-?\d+\s*,\s*\d\s*$') { throw "Belirsiz cevap: ondalik mi koordinat mi anlasilmiyor. Koordinat icin '15, 15', tek ondalik icin '15.5' yaz. Girilen: $t" }
-  $m = [regex]::Match($s, '(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)')
+  $m = [regex]::Match($s, '(-?\d+(?:\.\d+)?)\s*[,;/\s]\s*(-?\d+(?:\.\d+)?)')
   if (-not $m.Success) { throw "Cevap anlasilmadi. Iki sayi bekleniyor (ornek: 15,15 veya 15 15). Girilen: $t" }
   $x = [double]$m.Groups[1].Value
   $y = [double]$m.Groups[2].Value
@@ -175,14 +188,38 @@ function Invoke-QuestionParser($specObj, $question, $answer) {
         if ($tt -and [string]$tt.id -eq $tid) { $t = $tt; break }
       }
       if ($null -eq $t) { return @{ ok = $false; message = ("Kesik bulunamadi: " + $tid) } }
-      $dm = [regex]::Match([string]$answer, '(-?\d+(?:[.,]\d+)?)\s*[xX\u00d7]\s*(-?\d+(?:[.,]\d+)?)')
-      if (-not $dm.Success) { return @{ ok = $false; message = ("Kesik olcusu anlasilmadi (ornek: 20x10). Girilen: " + $answer) } }
-      $t.width_mm = Get-NumU $dm.Groups[1].Value; $t.length_mm = Get-NumU $dm.Groups[2].Value
+      $ansN = ([string]$answer -replace '[\u2715\u2716\u2a2f\u00d7\*]', 'x') -replace '(?i)[c\u00e7]arp[i\u0131]', 'x'
+      $dm = [regex]::Match($ansN, '(-?\d+(?:[.,]\d+)?)\s*[xX]\s*(-?\d+(?:[.,]\d+)?)')
+      if ($dm.Success) { $t.width_mm = Get-NumU $dm.Groups[1].Value; $t.length_mm = Get-NumU $dm.Groups[2].Value }
+      elseif ($null -eq $t.width_mm -or $null -eq $t.length_mm) { return @{ ok = $false; message = ("Kesik olcusu anlasilmadi (ornek: 20x10). Girilen: " + $answer) } }
       $pm = [regex]::Match([string]$answer, 'konum\s*(-?\d+(?:[.,]\d+)?)\s*[,;]\s*(-?\d+(?:[.,]\d+)?)')
       if ($pm.Success) { $t.pos_x_mm = Get-NumU $pm.Groups[1].Value; $t.pos_y_mm = Get-NumU $pm.Groups[2].Value }
+      else {
+        $pm1 = [regex]::Match([string]$answer, 'konum\s*(-?\d+(?:[.,]\d+)?)')
+        if ($pm1.Success -and $null -eq $t.pos_x_mm) { $t.pos_x_mm = Get-NumU $pm1.Groups[1].Value }
+      }
       $dep = [regex]::Match([string]$answer, 'derinlik\s*(-?\d+(?:[.,]\d+)?)')
       if ($dep.Success) { $t.depth_mm = Get-NumU $dep.Groups[1].Value }
-      if ($null -ne $t.pos_x_mm -and $null -ne $t.depth_mm) { $t.status = "ok" }
+      # Olcusu bilinen kesikte yalın sayı ilk eksige yazilir: pos_x, pos_y, depth sirasiyla.
+      if (-not $dm.Success -and -not $pm.Success -and -not $dep.Success -and $pm1 -eq $null) {
+        $solo = [regex]::Match([string]$answer, '^\s*(-?\d+(?:[.,]\d+)?)\s*(?:mm)?\s*$')
+        if ($solo.Success) {
+          $sv = Get-NumU $solo.Groups[1].Value
+          if ($sv -le 0) { return @{ ok = $false; message = ("Konum/derinlik pozitif olmali. Girilen: " + $answer) } }
+          if ($null -eq $t.pos_x_mm) { $t.pos_x_mm = $sv }
+          elseif ($null -eq $t.pos_y_mm) { $t.pos_y_mm = $sv }
+          elseif ($null -eq $t.depth_mm -and [string]$t.penetration -ne "through_wall") { $t.depth_mm = $sv }
+          else { return @{ ok = $false; message = ("Kesikte eksik sayisal alan yok; cevap islenemedi. Girilen: " + $answer) } }
+        } else {
+          return @{ ok = $false; message = ("Kesik cevabi anlasilmadi (ornek: 20x10, konum 5,5, derinlik 8 - veya yalniz eksik sayi). Girilen: " + $answer) }
+        }
+      }
+      $depthFilled = ($null -ne $t.depth_mm -or [string]$t.penetration -eq "through_wall")
+      if ($null -ne $t.width_mm -and $null -ne $t.length_mm -and $null -ne $t.pos_x_mm -and $null -ne $t.pos_y_mm -and $depthFilled) { $t.status = "ok" }
+    } elseif ($kind -eq "divider_thickness") {
+      if ($null -eq $comp.divider_pattern) { return @{ ok = $false; message = "Bolme deseni bulunamadi." } }
+      $comp.divider_pattern.thickness_mm = Parse-One $answer
+      $comp.divider_pattern.status = "ok"
     } elseif ($kind -eq "clearance") {
       $v = Parse-One $answer
       $comp.tolerance.clearance_mm = $v; $comp.tolerance.status = "ok"

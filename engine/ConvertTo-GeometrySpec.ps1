@@ -608,49 +608,30 @@ elseif ($low -match "d[o\u00f6]rt\s*b[o\u00f6]lme") { $divN = 4 }
   elseif ($low -match "b[o\u00f6]lme") { $divN = 1 }
 }
 if ($null -ne $divN) {
-  # COMPONENT vs FEATURE: "ayri parca degil / modellenmesin" -> butunlesik (integrated),
-  # "ayri / cikarilabilir / bagimsiz" -> ayri component. Geometri ayni kalir; karar metadata'da.
-  $divIntegrated = $false
-  if ($low -match 'ayr[i\u0131]\s*par[c\u00e7]a\s*de[g\u011fg]il' -or $low -match 'ayr[i\u0131][^.]{0,25}modellenmesin') { $divIntegrated = $true }
-  else {
-    $containCtx = [regex]::IsMatch($low, 'i[c\u00e7]inde|dahili|g[o\u00f6]vde\s*par[c\u00e7]as[i\u0131]')
-    $detachCtx = [regex]::IsMatch($low, 'ayr[i\u0131]|[c\u00e7][i\u0131]kar[i\u0131]labilir|ba[g\u011fg][i\u0131]ms[i\u0131]z')
-    if ($containCtx -and -not $detachCtx) { $divIntegrated = $true }
-  }
-  for ($di = 1; $di -le $divN; $di++) {
-    $dv = [pscustomobject]@{
-      id = ("div" + $di); label = ("bolme " + $di)
-      base = [pscustomobject]@{ shape = "box"; width_mm = $null; depth_mm = $null; height_mm = $null }
-      hollow = $null; holes = @(); cutouts = @(); edge_notes = @(); transforms = @()
-      tolerance = $null; expected_bbox = $null
-      role = "partition"; integrated = $divIntegrated
-    }
-    $components.Add($dv)
-  }
+  # Adim A (spec 2.1): bolmeler bagimsiz component DEGIL, govde-ici ozellik
+  # (body.divider_pattern). Ic olculer govdeden turetilir; dis olcu sorulmaz.
   # Bolme kalinligi: ortak cozucu (bolme baglami sart; iki sira da yakalanir).
   $divTh = $null
   $divThM = Find-Measure $low 'kal[i\u0131]nl[i\u0131][kg\u011f][i\u0131]?\w*' 60 $mpClaimed 'b[o\u00f6]lme' 70 @($bodySpan)
   if ($null -ne $divThM) { $divTh = [double]$divThM.value }
-  if ($null -ne $divTh) {
-    foreach ($dv2 in $components) {
-      if ($dv2 -and [string]$dv2.id -like "div*") {
-        $dv2 | Add-Member -NotePropertyName "thickness_mm" -NotePropertyValue $divTh -Force
-      }
-    }
-  }
-  # Bolme ust-boslugu: bolme baglamindaki "ust kenardan 5 mm" -> top_gap_mm.
-  $divGap = $null
+  # Bolme ust-boslugu: bolme baglamindaki "ust kenardan 5 mm" -> top_gap_mm (yoksa 0, derived).
+  $divGap = 0
+  $divGapDerived = $true
   foreach ($gm in [regex]::Matches($low, '[u\u00fc]st\s*kenardan\s*(\d+(?:[.,]\d+)?)')) {
     foreach ($bm in [regex]::Matches($low, 'b[o\u00f6]lme')) {
-      if ([Math]::Abs($gm.Index - $bm.Index) -le 50) { $divGap = (Get-Num $gm.Groups[1].Value) }
+      if ([Math]::Abs($gm.Index - $bm.Index) -le 50) { $divGap = (Get-Num $gm.Groups[1].Value); $divGapDerived = $false }
     }
   }
-  if ($null -ne $divGap) {
-    foreach ($dv2 in $components) {
-      if ($dv2 -and [string]$dv2.id -like "div*") {
-        $dv2 | Add-Member -NotePropertyName "top_gap_mm" -NotePropertyValue $divGap -Force
-      }
-    }
+  $divStatus = "missing"
+  if ($null -ne $divTh) { $divStatus = "ok" }
+  $comp | Add-Member -NotePropertyName "divider_pattern" -NotePropertyValue ([pscustomobject]@{
+    count = $divN; thickness_mm = $divTh; top_gap_mm = $divGap; top_gap_derived = $divGapDerived
+    orientation = "along_length"; status = $divStatus
+  }) -Force
+  if ($null -eq $comp.hollow) {
+    # Bolme ic hacim gerektirir: govde yoksa bos kabuk kurulur, degerler sorulur (uydurulmaz).
+    $comp.hollow = [pscustomobject]@{ wall_mm = $null; open_top = $null; bottom_thickness_mm = $bottomTh }
+    $questions.Add("Duvar kalinligi nedir? (ornek: duvar 2.5). Uydurulamaz.")
   }
 }
 # "kapaksiz" (kapak YOK) ve "kapak montaj noktasi" (montaj ozelligi, kapak DEGIL) lid uretmez.
@@ -685,9 +666,11 @@ foreach ($mk in @(@("pla", "PLA"), @("petg", "PETG"), @("abs", "ABS"), @("asa", 
 }
 if ($null -eq $specMaterial -and $low -match '\bpc\b') { $specMaterial = "PC" }
 
+$specVer = "2.0"
+if ($null -ne $comp.divider_pattern) { $specVer = "2.1" }
 $specObj2 = [pscustomobject]@{
   project_name = $ProjectName; prompt = $Prompt
-  metadata = [pscustomobject]@{ spec_version = "2.0" }
+  metadata = [pscustomobject]@{ spec_version = $specVer }
   components = @($components.ToArray()); assembly = $assembly; material = $specMaterial
 }
 
