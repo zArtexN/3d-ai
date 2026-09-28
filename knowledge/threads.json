@@ -1,0 +1,98 @@
+[
+  {
+    "size": "M2",
+    "provenance": { "source_type": "reference", "status": "reference", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true },
+    "pitch_mm": 0.4,
+    "major_diameter_mm": 2.0,
+    "minor_diameter_mm": 1.509,
+    "tap_drill_mm": 1.6,
+    "clearance_hole_mm": 2.4,
+    "close_fit_hole_mm": 2.2,
+    "fdm_internal_note": "Unprintable with standard FDM. Use heat-set inserts or self-tapping screws.",
+    "fdm_external_note": "Unprintable with standard FDM due to fine pitch and small diameter."
+  },
+  {
+    "size": "M2.5",
+    "provenance": { "source_type": "reference", "status": "reference", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true },
+    "pitch_mm": 0.45,
+    "major_diameter_mm": 2.5,
+    "minor_diameter_mm": 1.958,
+    "tap_drill_mm": 2.05,
+    "clearance_hole_mm": 2.9,
+    "close_fit_hole_mm": 2.7,
+    "fdm_internal_note": "Unprintable with standard FDM. Use heat-set inserts.",
+    "fdm_external_note": "Unprintable with standard FDM."
+  },
+  {
+    "size": "M3",
+    "provenance": { "source_type": "reference", "status": "reference", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true },
+    "pitch_mm": 0.5,
+    "major_diameter_mm": 3.0,
+    "minor_diameter_mm": 2.459,
+    "tap_drill_mm": 2.5,
+    "clearance_hole_mm": 3.4,
+    "close_fit_hole_mm": 3.2,
+    "fdm_internal_note": "FDM printed threads below M6 are generally weak. Consider heat-set inserts for M3.",
+    "fdm_external_note": "External threads printable with sufficient resolution (0.1mm layer height or less). Vertical orientation recommended."
+  },
+  {
+    "size": "M4",
+    "provenance": { "source_type": "reference", "status": "reference", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true },
+    "pitch_mm": 0.7,
+    "major_diameter_mm": 4.0,
+    "minor_diameter_mm": 3.141,
+    "tap_drill_mm": 3.3,
+    "clearance_hole_mm": 4.5,
+    "close_fit_hole_mm": 4.3,
+    "fdm_internal_note": "Barely printable, but weak and easily stripped. Heat-set inserts highly recommended.",
+    "fdm_external_note": "Printable. Use fine layer heights."
+  },
+  {
+    "size": "M5",
+    "provenance": { "source_type": "reference", "status": "reference", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true },
+    "pitch_mm": 0.8,
+    "major_diameter_mm": 5.0,
+    "minor_diameter_mm": 4.019,
+    "tap_drill_mm": 4.2,
+    "clearance_hole_mm": 5.5,
+    "close_fit_hole_mm": 5.3,
+    "fdm_internal_note": "Can be printed and tapped, but pull-out strength is low.",
+    "fdm_external_note": "Generally prints well vertically with 0.12mm to 0.16mm layers."
+  },
+  {
+    "size": "M6",
+    "provenance": { "source_type": "reference", "status": "reference", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true },
+    "pitch_mm": 1.0,
+    "major_diameter_mm": 6.0,
+    "minor_diameter_mm": 4.773,
+    "tap_drill_mm": 5.0,
+    "clearance_hole_mm": 6.6,
+    "close_fit_hole_mm": 6.4,
+    "fdm_internal_note": "Printable. Modeling threads directly can work if clearance is added.",
+    "fdm_external_note": "Prints reliably with 0.16mm to 0.2mm layers."
+  },
+  {
+    "size": "M8",
+    "provenance": { "source_type": "reference", "status": "reference", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true },
+    "pitch_mm": 1.25,
+    "major_diameter_mm": 8.0,
+    "minor_diameter_mm": 6.466,
+    "tap_drill_mm": 6.8,
+    "clearance_hole_mm": 9.0,
+    "close_fit_hole_mm": 8.4,
+    "fdm_internal_note": "Prints well. Standard clearance of ~0.15mm is recommended for CAD modeled threads.",
+    "fdm_external_note": "Very robust printed thread. Ensure adequate wall thickness."
+  },
+  {
+    "size": "M10",
+    "provenance": { "source_type": "reference", "status": "reference", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true },
+    "pitch_mm": 1.5,
+    "major_diameter_mm": 10.0,
+    "minor_diameter_mm": 8.16,
+    "tap_drill_mm": 8.5,
+    "clearance_hole_mm": 11.0,
+    "close_fit_hole_mm": 10.5,
+    "fdm_internal_note": "Excellent printability. Very strong when printed horizontally, moderate vertically.",
+    "fdm_external_note": "Excellent printability."
+  }
+]

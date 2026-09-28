@@ -2,7 +2,7 @@
     "project_name":  "organizer-v12",
     "prompt":  "120x80x40 mm ölçülerinde masaüstü organizer yap. Duvar kalınlığı 2 mm olsun. İçinde iki bölme olsun. Kapak ayrı parça olsun. Kapak ile gövde arasında 0.2 mm boşluk bırak. Kapakta 5 mm çapında iki delik olsun ve delikler yan kenarlardan 15 mm içeride bulunsun.",
     "metadata":  {
-                     "spec_version":  "2.0"
+                     "spec_version":  "2.1"
                  },
     "components":  [
                        {
@@ -16,7 +16,8 @@
                                     },
                            "hollow":  {
                                           "wall_mm":  2,
-                                          "open_top":  true
+                                          "open_top":  true,
+                                          "bottom_thickness_mm":  null
                                       },
                            "holes":  [
 
@@ -36,57 +37,15 @@
                                              "fit_to":  null,
                                              "status":  "ok"
                                          },
-                           "expected_bbox":  null
-                       },
-                       {
-                           "id":  "div1",
-                           "label":  "bolme 1",
-                           "base":  {
-                                        "shape":  "box",
-                                        "width_mm":  50,
-                                        "depth_mm":  70,
-                                        "height_mm":  30
-                                    },
-                           "hollow":  null,
-                           "holes":  [
-
-                                     ],
-                           "cutouts":  [
-
-                                       ],
-                           "edge_notes":  [
-
-                                          ],
-                           "transforms":  [
-
-                                          ],
-                           "tolerance":  null,
-                           "expected_bbox":  null
-                       },
-                       {
-                           "id":  "div2",
-                           "label":  "bolme 2",
-                           "base":  {
-                                        "shape":  "box",
-                                        "width_mm":  30,
-                                        "depth_mm":  70,
-                                        "height_mm":  30
-                                    },
-                           "hollow":  null,
-                           "holes":  [
-
-                                     ],
-                           "cutouts":  [
-
-                                       ],
-                           "edge_notes":  [
-
-                                          ],
-                           "transforms":  [
-
-                                          ],
-                           "tolerance":  null,
-                           "expected_bbox":  null
+                           "expected_bbox":  null,
+                           "divider_pattern":  {
+                                                   "count":  2,
+                                                   "thickness_mm":  2,
+                                                   "top_gap_mm":  0,
+                                                   "top_gap_derived":  true,
+                                                   "orientation":  "along_length",
+                                                   "status":  "ok"
+                                               }
                        },
                        {
                            "id":  "lid",
@@ -104,7 +63,7 @@
                                              "hole_type":  "through",
                                              "diameter_mm":  5,
                                              "center_x_mm":  15,
-                                             "center_y_mm":  20,
+                                             "center_y_mm":  15,
                                              "axis":  "z",
                                              "depth_mm":  null,
                                              "cs_dia_mm":  null,
@@ -112,14 +71,15 @@
                                              "cb_dia_mm":  null,
                                              "cb_depth_mm":  null,
                                              "screw":  null,
-                                             "status":  "ok"
+                                             "status":  "ok",
+                                             "edge_offset_mm":  15
                                          },
                                          {
                                              "id":  "h2",
                                              "hole_type":  "through",
                                              "diameter_mm":  5,
                                              "center_x_mm":  105,
-                                             "center_y_mm":  20,
+                                             "center_y_mm":  15,
                                              "axis":  "z",
                                              "depth_mm":  null,
                                              "cs_dia_mm":  null,
@@ -127,7 +87,8 @@
                                              "cb_dia_mm":  null,
                                              "cb_depth_mm":  null,
                                              "screw":  null,
-                                             "status":  "ok"
+                                             "status":  "ok",
+                                             "edge_offset_mm":  15
                                          }
                                      ],
                            "cutouts":  [

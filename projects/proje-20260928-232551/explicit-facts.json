@@ -1,0 +1,74 @@
+﻿{
+    "facts":  [
+                  {
+                      "factType":  "dimension",
+                      "target":  "body",
+                      "property":  "width",
+                      "value":  60,
+                      "unit":  "mm",
+                      "source":  "60x25x12",
+                      "confidence":  1,
+                      "mention_id":  "m1"
+                  },
+                  {
+                      "factType":  "dimension",
+                      "target":  "body",
+                      "property":  "depth",
+                      "value":  25,
+                      "unit":  "mm",
+                      "source":  "60x25x12",
+                      "confidence":  1,
+                      "mention_id":  "m1"
+                  },
+                  {
+                      "factType":  "dimension",
+                      "target":  "body",
+                      "property":  "height",
+                      "value":  12,
+                      "unit":  "mm",
+                      "source":  "60x25x12",
+                      "confidence":  1,
+                      "mention_id":  "m1"
+                  },
+                  {
+                      "factType":  "feature",
+                      "target":  "body.hollow",
+                      "property":  "wall_mm",
+                      "value":  3,
+                      "unit":  "mm",
+                      "source":  "3 mm",
+                      "confidence":  1,
+                      "mention_id":  "m3"
+                  },
+                  {
+                      "factType":  "feature",
+                      "target":  "body.hollow",
+                      "property":  "bottom_thickness_mm",
+                      "value":  3,
+                      "unit":  "mm",
+                      "source":  "3 mm",
+                      "confidence":  1,
+                      "mention_id":  "m3"
+                  },
+                  {
+                      "factType":  "feature",
+                      "target":  "body.hollow",
+                      "property":  "open_top",
+                      "value":  true,
+                      "unit":  "",
+                      "source":  "üstten açık",
+                      "confidence":  1,
+                      "mention_id":  null
+                  },
+                  {
+                      "factType":  "feature",
+                      "target":  "body.holes",
+                      "property":  "diameter_mm",
+                      "value":  6,
+                      "unit":  "mm",
+                      "source":  "çapı 6",
+                      "confidence":  1,
+                      "mention_id":  "m2"
+                  }
+              ]
+}

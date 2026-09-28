@@ -7,14 +7,12 @@
 | Parca | Durum | bbox min | bbox max | STL |
 | ----- | ----- | -------- | -------- | --- |
 | body | PASS | 0, 0, 0 | 120, 80, 40 | output/body.stl |
-| div1 | PASS | 0, 0, 0 | 50, 70, 30 | output/div1.stl |
-| div2 | PASS | 0, 0, 0 | 30, 70, 30 | output/div2.stl |
+| divider_001 | PASS | 39,3333333333333, 2, 2 | 41,3333333333333, 78, 40 | output/body.stl (govde-ici) |
+| divider_002 | PASS | 78,6666666666667, 2, 2 | 80,6666666666667, 78, 40 | output/body.stl (govde-ici) |
 | lid | PASS | 0, 0, 0 | 119,6, 79,6, 5 | output/lid.stl |
 
 ## Dogrulama
 - Proje status: PASS
-- WARNING: (div1) tolerans belirtilmedi
-- WARNING: (div2) tolerans belirtilmedi
 
 ## Montaj (metadata, simulasyon yok)
 - j1: sliding_fit (body + lid, clearance 0.2)

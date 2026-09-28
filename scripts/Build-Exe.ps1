@@ -1,14 +1,13 @@
 <#
 .SYNOPSIS
-  3D-AI-Designer EXE paketleme (hafif launcher, gomulu bagimlilik YOK).
+  3D-AI-Designer EXE paketleme. BUILD -> VERIFY -> SMOKE TEST
 .DESCRIPTION
-  1. csc.exe arar (.NET Framework, derleme icin yeter; SDK gerekmez).
-  2. Bulunamazsa: acik hata + dependency-free .cmd launcher yazar (sahte .exe YOK).
-  3. Bulunursa: C# launcher derler -> dist/3D-AI-Designer.exe + portable agac kopyalanir:
-     dist/3D-AI-Designer.exe, app/, engine/, scripts/, schemas/, templates/,
-     printers/, materials/, projects/, docs/, settings.json, README.md, VERSION.
-     OpenSCAD/FreeCAD/OrcaSlicer GOMULMEZ; calisma aninda resolver bulur.
-  Calistirma: powershell -ExecutionPolicy Bypass -File ".\scripts\Build-Exe.ps1"
+  1. Staging directory olusturur.
+  2. C# launcher derler (argumanlari destekler).
+  3. Gerekli dosyalari kopyalar.
+  4. PE header dogrular.
+  5. Smoke test calistirir (-ValidateUI argumaniyla).
+  6. Basarili olursa dist klasorunu gunceller.
 #>
 param([switch]$PreflightOnly)
 
@@ -31,13 +30,8 @@ function Find-Csc {
 
 $csc = Find-Csc
 if (-not $csc) {
-  $cmd = Join-Path $Root "3D-AI-Designer.cmd"
-  '@echo off' | Set-Content -LiteralPath $cmd -Encoding ASCII
-  'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0app\DesignerV1.ps1"' | Add-Content -LiteralPath $cmd -Encoding ASCII
   Write-Output "BUILD: csc bulunamadi (EXE derlenemez)."
-  Write-Output "BUILD: dependency-free baslatici yazildi: 3D-AI-Designer.cmd"
-  Write-Output "BUILD: .NET Framework csc.exe kurulu PC'de tekrar calistir."
-  if ($PreflightOnly) { exit 2 } else { exit 0 }
+  if ($PreflightOnly) { exit 2 } else { exit 1 }
 }
 Write-Output ("BUILD: derleyici: " + $csc)
 
@@ -49,7 +43,7 @@ using System.Reflection;
 using System.Windows.Forms;
 class Launcher {
   [STAThread]
-  static int Main() {
+  static int Main(string[] args) {
     try {
       string dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
       string app = Path.Combine(dir, "app" + Path.DirectorySeparatorChar + "DesignerV1.ps1");
@@ -60,9 +54,17 @@ class Launcher {
       }
       string pwsh = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell" + Path.DirectorySeparatorChar + "v1.0" + Path.DirectorySeparatorChar + "powershell.exe");
       if (!File.Exists(pwsh)) { pwsh = "powershell.exe"; }
+      
+      string arguments = "-NoProfile -ExecutionPolicy Bypass -File \"" + app + "\"";
+      if (args.Length > 0) {
+        foreach(string a in args) {
+          arguments += " \"" + a.Replace("\"", "\\\"") + "\"";
+        }
+      }
+      
       ProcessStartInfo psi = new ProcessStartInfo();
       psi.FileName = pwsh;
-      psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -File \"" + app + "\"";
+      psi.Arguments = arguments;
       psi.WorkingDirectory = dir;
       psi.UseShellExecute = false;
       psi.RedirectStandardOutput = true;
@@ -77,7 +79,7 @@ class Launcher {
       }
       p.WaitForExit();
       int code = p.ExitCode;
-      if (code != 0) {
+      if (code != 0 && args.Length == 0) {
         string err = "";
         try { err = p.StandardError.ReadToEnd(); } catch { }
         if (err == null) { err = ""; }
@@ -108,36 +110,94 @@ if ($PreflightOnly) {
     [void]$fs.Read($mz, 0, 2)
     $fs.Close()
     Remove-Item -LiteralPath $tmpExe -Force -ErrorAction SilentlyContinue
-    if ($mz[0] -eq 77 -and $mz[1] -eq 90) { Write-Output "PREFLIGHT: PASS (derleme + PE dogrulandi)"; exit 0 }
+    if ($mz[0] -eq 77 -and $mz[1] -eq 90) { Write-Output "PREFLIGHT: PASS (derleme dogrulandi)"; exit 0 }
   }
-  Write-Output "PREFLIGHT: FAIL (derleme olmadi)"
+  Write-Output "PREFLIGHT: FAIL"
   exit 1
 }
 
-New-Item -ItemType Directory -Force -Path $Dist | Out-Null
-$exe = Join-Path $Dist "3D-AI-Designer.exe"
-if (Test-Path -LiteralPath $exe) { Remove-Item -LiteralPath $exe -Force }
-& $csc /nologo /target:winexe /r:System.Windows.Forms.dll /r:System.Drawing.dll /out:$exe $tmpCs 2>&1 | Out-Null
+$guid = [guid]::NewGuid().ToString().Substring(0,8)
+# Bayat staging artiklarini temizle (yarim kalmis build kalintisi; kullanici verisi icermez).
+foreach ($st in (Get-ChildItem -LiteralPath $Root -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "^dist_staging_" })) {
+  try { Remove-Item -LiteralPath $st.FullName -Recurse -Force -ErrorAction Stop } catch { Write-Output ("BUILD: eski staging silinemedi (kilitli olabilir): " + $st.Name) }
+}
+$Stage = Join-Path $Root "dist_staging_$guid"
+New-Item -ItemType Directory -Force -Path $Stage | Out-Null
+
+$exe = Join-Path $Stage "3D-AI-Designer.exe"
+$iconArg = @()
+$iconFile = Join-Path $Root (Join-Path "assets" "app.ico")
+if (Test-Path -LiteralPath $iconFile) { $iconArg = @("/win32icon:$iconFile"); Write-Output "BUILD: ikon gomuluyor (assets/app.ico)" }
+else { Write-Output "BUILD: ikon bulunamadi, ikonsuz derleniyor (scripts\New-AppIcon.ps1 calistir)" }
+& $csc /nologo /target:winexe /r:System.Windows.Forms.dll /r:System.Drawing.dll /out:$exe @iconArg $tmpCs 2>&1 | Out-Null
 Remove-Item -LiteralPath $tmpCs -Force -ErrorAction SilentlyContinue
-if (-not (Test-Path -LiteralPath $exe)) { throw "Derleme basarisiz (exe olusmadi)." }
-$age = ((Get-Date) - (Get-Item -LiteralPath $exe).LastWriteTime).TotalMinutes
-if ($age -gt 2) { throw "Derleme basarisiz (exe guncellenmedi)." }
-foreach ($d in @("app", "engine", "scripts", "schemas", "templates", "printers", "materials", "projects", "docs")) {
+
+Write-Output "BUILD: Kopyalama basliyor..."
+foreach ($d in @("app", "engine", "scripts", "schemas", "templates", "printers", "materials", "projects", "docs", "knowledge", "assets")) {
   $src = Join-Path $Root $d
   if (Test-Path -LiteralPath $src) {
-    $dst = Join-Path $Dist $d
-    if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Recurse -Force }
-    Copy-Item -LiteralPath $src -Destination $dst -Recurse -Force
+    Copy-Item -LiteralPath $src -Destination (Join-Path $Stage $d) -Recurse -Force
   }
 }
 foreach ($f in @("settings.json", "README.md", "VERSION")) {
   $src = Join-Path $Root $f
-  if (Test-Path -LiteralPath $src) { Copy-Item -LiteralPath $src -Destination (Join-Path $Dist $f) -Force }
+  if (Test-Path -LiteralPath $src) { Copy-Item -LiteralPath $src -Destination (Join-Path $Stage $f) -Force }
 }
-$gitInDist = Join-Path $Dist ".git"
+$gitInDist = Join-Path $Stage ".git"
 if (Test-Path -LiteralPath $gitInDist) { Remove-Item -LiteralPath $gitInDist -Recurse -Force }
-$nm = Join-Path $Dist (Join-Path ".opencode" "node_modules")
+$nm = Join-Path $Stage (Join-Path ".opencode" "node_modules")
 if (Test-Path -LiteralPath $nm) { Remove-Item -LiteralPath $nm -Recurse -Force }
-Write-Output ("BUILD: OK -> " + $exe)
-Write-Output "Kullanim: dist klasorunu kopyala, 3D-AI-Designer.exe cift tikla."
-Write-Output "Not: OpenSCAD/FreeCAD/OrcaSlicer gomulu degil; ilk acilista resolver bulur (Ayarlar > Konum Sec)."
+
+Write-Output "VERIFY: EXE olusumu kontrol ediliyor..."
+if (-not (Test-Path -LiteralPath $exe)) { 
+  Remove-Item -LiteralPath $Stage -Recurse -Force -ErrorAction SilentlyContinue
+  throw "Derleme basarisiz (exe olusmadi)." 
+}
+$fs = [System.IO.File]::OpenRead($exe)
+$mz = New-Object byte[] 2
+[void]$fs.Read($mz, 0, 2)
+$fs.Close()
+if ($mz[0] -ne 77 -or $mz[1] -ne 90) {
+  Remove-Item -LiteralPath $Stage -Recurse -Force -ErrorAction SilentlyContinue
+  throw "Derleme basarisiz (gecersiz PE header)."
+}
+Write-Output "VERIFY: PASS"
+
+Write-Output "SMOKE TEST: EXE calistiriliyor (-ValidateUI)..."
+$smoke = & $exe -ValidateUI 2>&1 | Out-String
+$smokeCode = $LASTEXITCODE
+if ($smokeCode -eq 0) {
+  Write-Output "SMOKE TEST: PASS"
+} else {
+  Remove-Item -LiteralPath $Stage -Recurse -Force -ErrorAction SilentlyContinue
+  Write-Output "SMOKE TEST CIKTISI: $smoke"
+  throw "SMOKE TEST: FAIL (Code $smokeCode). EXE bozuk."
+}
+
+# Calisan uygulama tespiti: dist kilitliyse anlasilir BLOCKED ver (kilit kirma yok).
+$running = @(Get-Process -Name "3D-AI-Designer" -ErrorAction SilentlyContinue)
+if ($running.Count -gt 0) {
+  Remove-Item -LiteralPath $Stage -Recurse -Force -ErrorAction SilentlyContinue
+  throw "BUILD BLOCKED: 3D-AI-Designer su an calisiyor (PID $($running[0].Id)). Once uygulamayi kapatip tekrar calistir. Staging temizlendi, mevcut dist degistirilmedi."
+}
+if (Test-Path -LiteralPath $Dist) {
+  $trash = Join-Path $Root "dist_trash_$guid"
+  $swapped = $false
+  for ($ri = 0; $ri -lt 6 -and -not $swapped; $ri++) {
+    try {
+      [System.GC]::Collect(); [System.GC]::WaitForPendingFinalizers()
+      Rename-Item -Path $Dist -NewName $trash -ErrorAction Stop
+      $swapped = $true
+    } catch {
+      if ($ri -eq 5) {
+        Remove-Item -LiteralPath $Stage -Recurse -Force -ErrorAction SilentlyContinue
+        throw ("BUILD BLOCKED: dist klasoru kilitli (baska islem kullaniyor olabilir). Staging temizlendi, mevcut dist degistirilmedi. Hata: " + $_.Exception.Message)
+      }
+      Start-Sleep -Seconds 3
+    }
+  }
+  $trashCount = @(Get-ChildItem -LiteralPath $Root -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "^dist_trash_" }).Count
+  Write-Output ("BUILD: eski dist yedeklendi (trash sayisi: " + $trashCount + "; kullanici projeleri trash icinde korunur, otomatik silinmez)")
+}
+Rename-Item -Path $Stage -NewName "dist" -ErrorAction Stop
+Write-Output ("BUILD: OK -> " + (Join-Path $Dist "3D-AI-Designer.exe"))

@@ -1,0 +1,54 @@
+﻿{
+    "facts":  [
+                  {
+                      "factType":  "dimension",
+                      "target":  "body",
+                      "property":  "width",
+                      "value":  120,
+                      "unit":  "mm",
+                      "source":  "120x80x40",
+                      "confidence":  1,
+                      "mention_id":  "m1"
+                  },
+                  {
+                      "factType":  "dimension",
+                      "target":  "body",
+                      "property":  "depth",
+                      "value":  80,
+                      "unit":  "mm",
+                      "source":  "120x80x40",
+                      "confidence":  1,
+                      "mention_id":  "m1"
+                  },
+                  {
+                      "factType":  "dimension",
+                      "target":  "body",
+                      "property":  "height",
+                      "value":  40,
+                      "unit":  "mm",
+                      "source":  "120x80x40",
+                      "confidence":  1,
+                      "mention_id":  "m1"
+                  },
+                  {
+                      "factType":  "feature",
+                      "target":  "body.hollow",
+                      "property":  "wall_mm",
+                      "value":  2,
+                      "unit":  "mm",
+                      "source":  "2 mm",
+                      "confidence":  1,
+                      "mention_id":  "m2"
+                  },
+                  {
+                      "factType":  "relation",
+                      "target":  "body.holes",
+                      "property":  "edge_offset_mm",
+                      "value":  15,
+                      "unit":  "mm",
+                      "source":  "kenarlardan 15",
+                      "confidence":  1,
+                      "mention_id":  "m5"
+                  }
+              ]
+}

@@ -1,8 +1,12 @@
-# 3D AI Designer V1.3 — 3D Printing AI Automation
+# 3D AI Designer V2.1 — AI Destekli 3D Printing Engineering Workstation
 
-Dogal dil / referans model -> olculere sadik parametrik model -> STL/3MF -> dogrulama -> README.
-Slicing ayri asama; G-code SADECE OrcaSlicer profilleriyle (su an kapali).
-V1.3: dark UI, referanstan tasarla, EXE build, kenar-konum parser.
+Dogal dil / referans model -> olculere sadik parametrik model -> STL/3MF -> dogrulama -> printability/orientation/maliyet analizi -> README.
+Slicing ayri asama; G-code SADECE gercek printer+filament+process profiliyle (su an kapali, BLOCKED).
+V2.1: dark industrial UI + ikon, parser hardening (kosegen delik yerlesimi, cap oneekleri, kapaksiz/bolme ayirimi), EXE build kilit korumasi.
+
+## Bu program ne yapar / ne yapmaz
+YAPAR: dogal dildeki tasarimi olculere sadik DesignSpec'e cevirir, sorulmasi gerekeni sorar, CAD/STL uretir, mesh/printability/orientation/maliyet analizi yapar, OrcaSlicer entegrasyonunu gercek profil varsa kullanir.
+YAPMAZ: printer/filament/nozzle/sicaklik/hiz/G-code/kalibrasyon degeri UYDURMAZ; eksikse UNKNOWN/BLOCKED/SORU verir. "Print Ready" / "Print completed" gibi sahte basari yazmaz.
 
 ## Calistirma
 - Uygulama: `powershell -File app\DesignerV1.ps1` (cift tik icin EXE build et)
@@ -39,8 +43,11 @@ Otomatik testler:
 - `powershell -File scripts\Run-Tests.ps1` (V1: 7 test, DEGISTIRME)
 - `powershell -File scripts\Run-GeometryTests.ps1` (V1.1: TEST 8-20)
 - `powershell -File scripts\Run-PipelineTests.ps1` (V1.2: T21-T44 + TA/B/C)
-- `powershell -File scripts\Run-ParserTests.ps1` (V1.2: P1-P16)
+- `powershell -File scripts\Run-ParserTests.ps1` (P1-P27: govde olculeri, delik cap/konum, kose-yerlesimi, kapaksiz, bolme ayirimi)
 - `powershell -File scripts\Run-V13Tests.ps1` (V1.3: P17-P20 + R21-R28)
+- `powershell -File scripts\Test-QA.ps1` (Q&A cevap parserlari + uctan uca cevap akisi)
+- `powershell -File scripts\Run-PrintTests.ps1` (printer profili, filament, printability, orientation, maliyet)
+- EXE calisiyorken build: BLOCKED verir (once uygulamayi kapat). `scripts\New-AppIcon.ps1` ikonu yeniden uretir.
 
 ## Klasorler
 - `.opencode/skills/3d-printing/` — zorunlu is akisi (Faz 3 kurallari)
@@ -62,6 +69,15 @@ Otomatik testler:
 prompt -> gereksinim analizi -> eksik kritik olcu -> soru -> parametrik OpenSCAD
 -> SCAD->STL -> STL dogrulama (bbox + delik) -> olcu karsilastirma -> final cikti.
 FAIL ise: teshis -> duzelt -> yeniden uret (max 3 tur) -> cozulmezse FAILED_AFTER_RETRIES.
+
+## Parserin anladigi kritik ifadeler (soyleneni tekrar sormaz)
+- `160x100x45 mm`, `160x100x45`, `160*100*45`, `160mm x 100mm x 45mm` -> body.dims
+- `ustu acik / ustten acik / ust kismi acik / kapaksiz` -> hollow_top=true (kapaksiz lid uretmez)
+- `4 adet O4.2 mm gecisli vida deligi` -> 4 delik, cap 4.2, through
+- `kenarlardan 8 mm` + kose baglami -> 4 delik deterministik koselere yerlesir (8,8 / 152,8 / 8,92 / 152,92)
+- `2 adet bolme` + `bolme kalinligi 2 mm`; `ayri parca degil` -> butunlesik isareti
+- `5 mm yaricap`, `1 mm pah`, `20x10 mm kablo acikligi`, `10x10 mm temas`
+- Belirsiz ifade (`biraz gevsek`, `saglam olsun`) -> deger uydurmaz, SORAR.
 
 ## Kurulumlar (portable resolver sirasi: settings.local > settings > env > tools/ > PATH > bilinen)
 - OpenSCAD: ZORUNLU (yoksa CAD calismaz; dost mesaji + Konum Sec). `tools/openscad/` altina da konabilir.

@@ -1,0 +1,75 @@
+﻿{
+    "mentions":  [
+                     {
+                         "id":  "m6",
+                         "kind":  "count",
+                         "raw":  "3 kanal",
+                         "span_start":  0,
+                         "span_length":  7,
+                         "value":  3,
+                         "unit":  "adet"
+                     },
+                     {
+                         "id":  "m1",
+                         "kind":  "triple",
+                         "raw":  "60 × 25 × 12",
+                         "span_start":  44,
+                         "span_length":  12,
+                         "value":  [
+                                       60,
+                                       25,
+                                       12
+                                   ],
+                         "unit":  "mm"
+                     },
+                     {
+                         "id":  "m3",
+                         "kind":  "measure",
+                         "raw":  "6 mm",
+                         "span_start":  87,
+                         "span_length":  4,
+                         "value":  6,
+                         "unit":  "mm"
+                     },
+                     {
+                         "id":  "m4",
+                         "kind":  "measure",
+                         "raw":  "3 mm",
+                         "span_start":  131,
+                         "span_length":  4,
+                         "value":  3,
+                         "unit":  "mm"
+                     },
+                     {
+                         "id":  "m5",
+                         "kind":  "measure",
+                         "raw":  "3 mm",
+                         "span_start":  162,
+                         "span_length":  4,
+                         "value":  3,
+                         "unit":  "mm"
+                     },
+                     {
+                         "id":  "m2",
+                         "kind":  "triple",
+                         "raw":  "60x25x12",
+                         "span_start":  402,
+                         "span_length":  8,
+                         "value":  [
+                                       60,
+                                       25,
+                                       12
+                                   ],
+                         "unit":  "mm"
+                     },
+                     {
+                         "id":  "m7",
+                         "kind":  "count",
+                         "raw":  "3\n\nkanal",
+                         "span_start":  569,
+                         "span_length":  8,
+                         "value":  3,
+                         "unit":  "adet"
+                     }
+                 ]
+}

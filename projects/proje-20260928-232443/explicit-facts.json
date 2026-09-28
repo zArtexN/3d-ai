@@ -1,0 +1,74 @@
+﻿{
+    "facts":  [
+                  {
+                      "factType":  "dimension",
+                      "target":  "body",
+                      "property":  "width",
+                      "value":  60,
+                      "unit":  "mm",
+                      "source":  "60 × 25 × 12",
+                      "confidence":  1,
+                      "mention_id":  "m1"
+                  },
+                  {
+                      "factType":  "dimension",
+                      "target":  "body",
+                      "property":  "depth",
+                      "value":  25,
+                      "unit":  "mm",
+                      "source":  "60 × 25 × 12",
+                      "confidence":  1,
+                      "mention_id":  "m1"
+                  },
+                  {
+                      "factType":  "dimension",
+                      "target":  "body",
+                      "property":  "height",
+                      "value":  12,
+                      "unit":  "mm",
+                      "source":  "60 × 25 × 12",
+                      "confidence":  1,
+                      "mention_id":  "m1"
+                  },
+                  {
+                      "factType":  "feature",
+                      "target":  "body.hollow",
+                      "property":  "bottom_thickness_mm",
+                      "value":  3,
+                      "unit":  "mm",
+                      "source":  "3 mm",
+                      "confidence":  1,
+                      "mention_id":  "m4"
+                  },
+                  {
+                      "factType":  "feature",
+                      "target":  "body.hollow",
+                      "property":  "open_top",
+                      "value":  true,
+                      "unit":  "",
+                      "source":  "üstten açık",
+                      "confidence":  1,
+                      "mention_id":  null
+                  },
+                  {
+                      "factType":  "feature",
+                      "target":  "body.c1",
+                      "property":  "width_mm",
+                      "value":  5,
+                      "unit":  "mm",
+                      "source":  "5x12",
+                      "confidence":  1,
+                      "mention_id":  "m2"
+                  },
+                  {
+                      "factType":  "feature",
+                      "target":  "body.c1",
+                      "property":  "length_mm",
+                      "value":  12,
+                      "unit":  "mm",
+                      "source":  "5x12",
+                      "confidence":  1,
+                      "mention_id":  "m2"
+                  }
+              ]
+}

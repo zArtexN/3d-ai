@@ -1,0 +1,34 @@
+﻿[
+    {
+        "question_id":  "body-cutout-c1",
+        "component":  "body",
+        "field":  "cutouts.c1",
+        "target":  "body.cutout.c1",
+        "kind":  "cutout",
+        "question":  "Kesik \u0027c1\u0027 eksikleri: yatay konum (tek sayi, ornek: 70); dikey konum (ornek: alttan 12); derinlik (ornek: derinlik 8). Bildirilenler korunur: olcu 5x12.",
+        "reason":  "eksik konum/olcu olmadan kesik cikarilamaz",
+        "answer":  null,
+        "source":  null,
+        "asked_at":  null,
+        "displayId":  "q1",
+        "parser":  "length",
+        "required":  true,
+        "priority":  1
+    },
+    {
+        "question_id":  "body-wall",
+        "component":  "body",
+        "field":  "hollow.wall_mm",
+        "target":  "body.wall",
+        "kind":  "wall",
+        "question":  "\u0027body\u0027 duvar kalinligi nedir? Ornek: duvar 2.5.",
+        "reason":  "duvar olmadan ici-bos geometri uretilemez; deger uydurulamaz",
+        "answer":  null,
+        "source":  null,
+        "asked_at":  null,
+        "displayId":  "q2",
+        "parser":  "length",
+        "required":  true,
+        "priority":  2
+    }
+]

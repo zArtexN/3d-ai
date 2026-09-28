@@ -5,3 +5,14 @@ settings.local.json
 dist/
 *.bak
 *.tmp
+# Local/generated build archives
+dist_old/
+dist_trash_*/
+
+# Local vendor/reference repositories
+vendor/
+
+# Generated test/project runtime artifacts
+projects/*/logs/
+projects/*/output/
+projects/*/validation/

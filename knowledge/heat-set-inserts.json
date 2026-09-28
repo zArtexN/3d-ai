@@ -1,0 +1,62 @@
+[
+  {
+    "thread_size": "M2",
+    "provenance": { "source_type": "reference", "status": "reference", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true },
+    "insert_outer_diameter_mm": 3.6,
+    "insert_length_mm": 4.0,
+    "recommended_hole_diameter_mm": 3.2,
+    "recommended_hole_depth_mm": 4.5,
+    "recommended_boss_diameter_mm": 6.0,
+    "min_wall_around_insert_mm": 1.2,
+    "source": "Common manufacturer specifications (CNC Kitchen / Ruthex typical)",
+    "note": "Actual dimensions vary by manufacturer. Always check datasheet."
+  },
+  {
+    "thread_size": "M2.5",
+    "provenance": { "source_type": "reference", "status": "reference", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true },
+    "insert_outer_diameter_mm": 4.6,
+    "insert_length_mm": 5.5,
+    "recommended_hole_diameter_mm": 4.0,
+    "recommended_hole_depth_mm": 6.0,
+    "recommended_boss_diameter_mm": 7.0,
+    "min_wall_around_insert_mm": 1.5,
+    "source": "Common manufacturer specifications (CNC Kitchen / Ruthex typical)",
+    "note": "Actual dimensions vary by manufacturer. Always check datasheet."
+  },
+  {
+    "thread_size": "M3",
+    "provenance": { "source_type": "reference", "status": "reference", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true },
+    "insert_outer_diameter_mm": 4.6,
+    "insert_length_mm": 5.7,
+    "recommended_hole_diameter_mm": 4.0,
+    "recommended_hole_depth_mm": 6.2,
+    "recommended_boss_diameter_mm": 7.0,
+    "min_wall_around_insert_mm": 1.5,
+    "source": "Common manufacturer specifications (CNC Kitchen / Ruthex typical)",
+    "note": "Actual dimensions vary by manufacturer. Always check datasheet. Some M3 inserts have OD 4.0 or 5.0."
+  },
+  {
+    "thread_size": "M4",
+    "provenance": { "source_type": "reference", "status": "reference", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true },
+    "insert_outer_diameter_mm": 6.3,
+    "insert_length_mm": 8.1,
+    "recommended_hole_diameter_mm": 5.6,
+    "recommended_hole_depth_mm": 8.6,
+    "recommended_boss_diameter_mm": 9.6,
+    "min_wall_around_insert_mm": 2.0,
+    "source": "Common manufacturer specifications (CNC Kitchen / Ruthex typical)",
+    "note": "Actual dimensions vary by manufacturer. Always check datasheet."
+  },
+  {
+    "thread_size": "M5",
+    "provenance": { "source_type": "reference", "status": "reference", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true },
+    "insert_outer_diameter_mm": 7.1,
+    "insert_length_mm": 9.5,
+    "recommended_hole_diameter_mm": 6.4,
+    "recommended_hole_depth_mm": 10.0,
+    "recommended_boss_diameter_mm": 10.4,
+    "min_wall_around_insert_mm": 2.0,
+    "source": "Common manufacturer specifications (CNC Kitchen / Ruthex typical)",
+    "note": "Actual dimensions vary by manufacturer. Always check datasheet."
+  }
+]

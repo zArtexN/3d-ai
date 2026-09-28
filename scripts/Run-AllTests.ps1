@@ -109,13 +109,25 @@ foreach ($r in @("Resolve-OpenScad.ps1", "Resolve-FreeCad.ps1", "Resolve-OrcaSli
   } catch { $totalFail++; $suitesOk = $false; Write-Output "[FAIL] $r" }
 }
 
-Write-Output "=== 11/11 PORTABLE ==="
+Write-Output "=== 11/13 PORTABLE ==="
 $port = & (Join-Path $scriptsDir "Run-PortableTest.ps1") 2>&1
 $c = Count-Results $port
 $totalPass += $c.pass; $totalFail += $c.fail
 $portOk = (@($port | Where-Object { [string]$_ -match "PORTABLE TEST PASS" }).Count -gt 0)
 if ($c.fail -gt 0 -or -not $portOk) { $suitesOk = $false }
 Write-Output "portable: $($c.pass) PASS, $($c.fail) FAIL"
+
+Write-Output "=== 12/13 PRINT TESTS ==="
+$pt = & (Join-Path $scriptsDir "Run-PrintTests.ps1") 2>&1
+$c = Count-Results $pt
+$totalPass += $c.pass; $totalFail += $c.fail
+if ($c.fail -gt 0) { $suitesOk = $false }
+Write-Output "print: $($c.pass) PASS, $($c.fail) FAIL"
+
+Write-Output "=== 13/13 UI V2 STARTUP ==="
+$ui2 = & (Join-Path $Root (Join-Path "app" "DesignerV1.ps1")) -ValidateUI 2>&1 | Out-String
+if ($ui2 -match "UI-STARTUP: PASS") { $totalPass++; Write-Output "UI V2 startup: PASS" }
+else { $totalFail++; $suitesOk = $false; Write-Output "UI V2 startup: FAIL" }
 
 $total = ($totalPass + $totalFail)
 Write-Output "========================================"

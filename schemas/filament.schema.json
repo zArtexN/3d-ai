@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "3D AI Designer V2.0 - Filament Profili",
+  "description": "Filament profil semasi. Deger yoksa null birakilir; sicaklik/hiz gibi degerler UYDURULMAZ. OrcaSlicer filament profili her zaman tek dogruluk kaynagi kalir.",
+  "type": "object",
+  "required": ["id", "material", "profile_source"],
+  "properties": {
+    "id": { "type": "string", "description": "Benzersiz filament ID (ornek: pla-esun-white)" },
+    "material": { "type": "string", "description": "Malzeme tipi: PLA, PETG, ABS, ASA, TPU, Nylon, PC" },
+    "brand": { "type": ["string", "null"], "description": "Marka (ornek: eSUN, Prusament). null = UNKNOWN." },
+    "color": { "type": ["string", "null"] },
+    "diameter_mm": { "type": ["number", "null"], "description": "Filament capi mm (genellikle 1.75). null = UNKNOWN." },
+    "density_g_cm3": { "type": ["number", "null"], "description": "Yogunluk g/cm3. null = bilinmiyor, knowledge base'den alinabilir." },
+    "spool_weight_g": { "type": ["number", "null"], "description": "Makara net agirlik (g). null = UNKNOWN." },
+    "remaining_weight_g": { "type": ["number", "null"], "description": "Kalan agirlik (g). null = UNKNOWN." },
+    "price_per_kg": { "type": ["number", "null"], "description": "Fiyat/kg (para birimi belirtilmez). null = UNKNOWN." },
+    "nozzle_temp_min_c": { "type": ["number", "null"], "description": "Min nozul sicakligi. null = UNKNOWN. UYDURMA!" },
+    "nozzle_temp_max_c": { "type": ["number", "null"], "description": "Maks nozul sicakligi. null = UNKNOWN. UYDURMA!" },
+    "bed_temp_min_c": { "type": ["number", "null"], "description": "Min tabla sicakligi. null = UNKNOWN. UYDURMA!" },
+    "bed_temp_max_c": { "type": ["number", "null"], "description": "Maks tabla sicakligi. null = UNKNOWN. UYDURMA!" },
+    "cooling_fan_pct": { "type": ["number", "null"], "description": "Onerilen fan yuzdesi. null = UNKNOWN." },
+    "shrinkage_pct": { "type": ["number", "null"], "description": "Cekme yuzdesi. null = UNKNOWN." },
+    "moisture_sensitive": { "type": ["boolean", "null"], "description": "Neme duyarli mi? null = UNKNOWN." },
+    "drying_required": { "type": ["boolean", "null"], "description": "Kurutma gerekli mi? null = UNKNOWN." },
+    "drying_temp_c": { "type": ["number", "null"], "description": "Kurutma sicakligi. null = UNKNOWN." },
+    "drying_hours": { "type": ["number", "null"], "description": "Kurutma suresi (saat). null = UNKNOWN." },
+    "recommended_speed_min_mm_s": { "type": ["number", "null"], "description": "Min onerilen hiz. null = UNKNOWN." },
+    "recommended_speed_max_mm_s": { "type": ["number", "null"], "description": "Maks onerilen hiz. null = UNKNOWN." },
+    "profile_source": { "type": "string", "description": "'orca:PROFIL_ADI', 'user_input', veya 'belirtilmedi'" },
+    "notes": { "type": ["string", "null"] },
+    "created_at": { "type": ["string", "null"] }
+  }
+}

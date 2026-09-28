@@ -55,12 +55,12 @@ $b = $spec.components[0]
 Add-MPResult "T-MP-03a" (NumEq $b.hollow.wall_mm 2.5) ("karisik duvar=" + $b.hollow.wall_mm + " (beklenen 2.5)")
 Add-MPResult "T-MP-03b" (NumEq $b.hollow.bottom_thickness_mm 3) ("karisik taban=" + $b.hollow.bottom_thickness_mm + " (beklenen 3)")
 
-# T-MP-04: bolme kalinligi (bolmeden sonra gelen olcu).
+# T-MP-04: bolme kalinligi (bolmeden sonra gelen olcu). Adim A sonrasi kanonik
+# konum body.divider_pattern'dir (bagimsiz div component yok).
 $spec = Get-MPSpec "80x40x20 kutu, ustu acik, duvar 2 mm, 2 bolme 2 mm kalinliginda" "mp04"
-$divs = @($spec.components | Where-Object { $_ -and [string]$_.id -like "div*" })
-$thOk = ($divs.Count -eq 2)
-foreach ($dv in $divs) { if (-not (NumEq $dv.thickness_mm 2)) { $thOk = $false } }
-Add-MPResult "T-MP-04" $thOk ("bolme kalinligi (beklenen 2x div thickness=2)")
+$dp = @($spec.components | Where-Object { $_.id -eq "body" })[0].divider_pattern
+$thOk = ($null -ne $dp -and [int]$dp.count -eq 2 -and (NumEq $dp.thickness_mm 2))
+Add-MPResult "T-MP-04" $thOk ("bolme kalinligi (beklenen pattern count=2 thickness=2)")
 
 # T-MP-05: kesik ofseti taban ile cakismamali.
 $spec = Get-MPSpec "80x40x20 kutu, duvar 2 mm, ustu acik, on yuzde 20x10 kesik tabandan 12 mm" "mp05a"
@@ -71,12 +71,11 @@ $spec = Get-MPSpec "80x40x20 kutu, duvar 2 mm, ustu acik, on yuzde 20x10 kesik a
 $b = $spec.components[0]
 Add-MPResult "T-MP-05c" (NumEq $b.cutouts[0].pos_y_mm 12) ("alttan-ofset pos_y=" + $b.cutouts[0].pos_y_mm + " (beklenen 12)")
 
-# T-MP-06: ayni degerli uc sayi; herkes en yakinini alir.
+# T-MP-06: ayni degerli uc sayi; herkes en yakinini alir (kanonik konum: pattern).
 $spec = Get-MPSpec "80x40x20 kutu, ustu acik, duvar 2 mm, bolme 2 adet, kalinlik 2 mm" "mp06"
 $b = $spec.components[0]
-$divs = @($spec.components | Where-Object { $_ -and [string]$_.id -like "div*" })
-$thOk6 = ($divs.Count -gt 0)
-foreach ($dv in $divs) { if (-not (NumEq $dv.thickness_mm 2)) { $thOk6 = $false } }
+$dp = $b.divider_pattern
+$thOk6 = ($null -ne $dp -and [int]$dp.count -gt 0 -and (NumEq $dp.thickness_mm 2))
 Add-MPResult "T-MP-06a" (NumEq $b.hollow.wall_mm 2) ("duvar ilk 2mm'yi aldi=" + $b.hollow.wall_mm)
 Add-MPResult "T-MP-06b" $thOk6 ("kalinlik son 2mm'yi aldi")
 

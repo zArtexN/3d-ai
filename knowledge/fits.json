@@ -1,0 +1,68 @@
+[
+  {
+    "id": "press_fit",
+    "name": "Press Fit",
+    "description": "Parts are forced together, friction holds them",
+    "typical_clearance_mm": "NEEDS_INPUT",
+    "clearance_note": "Depends on printer accuracy, material, and nominal dimension. Typically -0.1 to -0.2mm interference for FDM.",
+    "use_cases": ["Permanent joints", "Bearings", "Pins"],
+    "design_notes": ["Test with your printer first", "Material and printer accuracy critical", "Add a chamfer to aid insertion"],
+    "fdm_considerations": "FDM parts have anisotropic strength; press fit direction matters. Compressing layers is better than pulling them apart.",
+    "provenance": { "source_type": "reference", "status": "starting_point", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true }
+  },
+  {
+    "id": "sliding_fit",
+    "name": "Sliding Fit",
+    "description": "Parts can move relative to each other with minimal play",
+    "typical_clearance_mm": "0.1 to 0.2",
+    "clearance_note": "Usually requires +0.1mm to +0.2mm clearance depending on machine calibration.",
+    "use_cases": ["Sliders", "Pistons", "Adjustable mechanisms"],
+    "design_notes": ["Use a larger clearance for longer sliding surfaces to prevent binding", "Lubrication may be needed"],
+    "fdm_considerations": "Layer lines increase friction. Orient parts so layer lines are parallel to sliding direction if possible.",
+    "provenance": { "source_type": "reference", "status": "starting_point", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true }
+  },
+  {
+    "id": "clearance_fit",
+    "name": "Clearance Fit",
+    "description": "Parts assemble freely with intentional gap",
+    "typical_clearance_mm": "0.2 to 0.4",
+    "clearance_note": "Typically +0.2mm to +0.4mm gap between parts.",
+    "use_cases": ["Hinges", "Free-spinning axles", "Removable lids"],
+    "design_notes": ["If parts must spin freely, err on the side of larger clearances (>0.3mm)"],
+    "fdm_considerations": "Z-seams can cause bumps that interfere with clearance fits. Align seams away from moving surfaces.",
+    "provenance": { "source_type": "reference", "status": "starting_point", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true }
+  },
+  {
+    "id": "snap_fit",
+    "name": "Snap Fit",
+    "description": "Flexible features deflect and lock into place",
+    "typical_clearance_mm": "0.1 to 0.2",
+    "clearance_note": "Clearance at the locking face is usually 0.1mm to 0.2mm to ensure a tight lock.",
+    "use_cases": ["Enclosures", "Removable panels", "Tool-less assembly"],
+    "design_notes": ["Keep deflection angles under 15 degrees", "Avoid sharp corners at the base of the snap arm to prevent fatigue"],
+    "fdm_considerations": "Crucial to print snap arms with layer lines running along the length of the arm, not across it, to prevent snapping.",
+    "provenance": { "source_type": "reference", "status": "starting_point", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true }
+  },
+  {
+    "id": "screw_fit",
+    "name": "Screw Fit / Printed Threads",
+    "description": "Parts are joined using standard threaded geometry printed directly",
+    "typical_clearance_mm": "0.1 to 0.2",
+    "clearance_note": "Apply a negative horizontal expansion or clearance of ~0.1-0.2mm to the thread profile.",
+    "use_cases": ["Lids", "Connectors", "Custom hardware"],
+    "design_notes": ["Use a standard thread profile but scale clearance", "Custom coarse threads are easier to print than fine standard threads"],
+    "fdm_considerations": "Fine threads (<M6) are very difficult to print cleanly. Print threads vertically for best resolution.",
+    "provenance": { "source_type": "reference", "status": "starting_point", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true }
+  },
+  {
+    "id": "heat_set_insert",
+    "name": "Heat-Set Insert",
+    "description": "Metal threaded inserts melted into the plastic part",
+    "typical_clearance_mm": "-0.2 to -0.4",
+    "clearance_note": "Hole diameter should be slightly smaller than the insert outer diameter (see manufacturer specs).",
+    "use_cases": ["Strong reusable threads", "High load joints", "Enclosures opened frequently"],
+    "design_notes": ["Ensure sufficient wall thickness around the insert", "Hole depth should be slightly deeper than the insert"],
+    "fdm_considerations": "Works exceptionally well with thermoplastics like PLA, PETG, ABS. Requires a soldering iron for installation.",
+    "provenance": { "source_type": "reference", "status": "starting_point", "printer_specific": false, "filament_specific": false, "may_drive_gcode": false, "requires_printer_profile_for_application": true }
+  }
+]

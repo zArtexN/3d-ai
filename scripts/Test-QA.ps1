@@ -37,6 +37,14 @@ function New-QABody($holes, $tol) {
     tolerance = $tol; expected_bbox = $null; pending_rotate = $null; pending_mirror = $false
   }
 }
+function New-QABodyNoDims($holes, $tol) {
+  return [pscustomobject]@{
+    id = "body"; label = "body"
+    base = [pscustomobject]@{ shape = "box"; width_mm = $null; depth_mm = $null; height_mm = $null }
+    hollow = $null; holes = $holes; cutouts = @(); edge_notes = @(); transforms = @()
+    tolerance = $tol; expected_bbox = $null; pending_rotate = $null; pending_mirror = $false
+  }
+}
 function New-QASpec($dir, $name, $comp) {
   $spec = [pscustomobject]@{
     project_name = $name; prompt = $name
@@ -234,6 +242,67 @@ try {
   $ok = ($r.applied -and [double]$h.center_x_mm -eq 15 -and [double]$h.center_y_mm -eq 15)
   Add-QAResult "T-QA-19" $ok $(if ($ok) { "kabul" } else { "hata: $($r.error)" })
 } catch { Add-QAResult "T-QA-19" $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+
+# T-QA-20: govde olcusu cevaplari (160x100x45 bug repro: tum dogal varyantlar kabul)
+$dimsId = "body-dims"
+$multA = [char]0xD7
+foreach ($case in @(@("T-QA-20a", "160x100x45"), @("T-QA-20b", "160 x 100 x 45"), @("T-QA-20c", ("160 " + $multA + " 100 " + $multA + " 45 mm")), @("T-QA-20d", "160,100,45"), @("T-QA-20e", "160 100 45"), @("T-QA-20f", "160mm x 100mm x 45mm")) ) {
+  $d = New-QADir $case[0]
+  try {
+    $sp = New-QASpec $d $case[0] (New-QABodyNoDims @() $null)
+    $r = Invoke-QAAnswer $sp $dimsId $case[1]
+    $b = (Get-Content -LiteralPath $sp -Raw | ConvertFrom-Json).components[0].base
+    $ok = ($r.applied -and [double]$b.width_mm -eq 160 -and [double]$b.depth_mm -eq 100 -and [double]$b.height_mm -eq 45)
+    Add-QAResult $case[0] $ok $(if ($ok) { "kabul: $($case[1])" } else { "hata: $($r.error)" })
+  } catch { Add-QAResult $case[0] $false $_.Exception.Message }
+  finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+# T-QA-21: gecersiz govde olculeri red (2 boyut, anlamsiz, negatif)
+foreach ($case in @(@("T-QA-21a", "20x10"), @("T-QA-21b", "biraz"), @("T-QA-21c", "abc"), @("T-QA-21d", "-5x10x20")) ) {
+  $d = New-QADir $case[0]
+  try {
+    $sp = New-QASpec $d $case[0] (New-QABodyNoDims @() $null)
+    $r = Invoke-QAAnswer $sp $dimsId $case[1]
+    $ok = ((-not $r.applied) -and [string]$r.error -ne "")
+    Add-QAResult $case[0] $ok $(if ($ok) { "reddedildi: $($r.error)" } else { "yanlis kabul!" })
+  } catch { Add-QAResult $case[0] $false $_.Exception.Message }
+  finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+# T-QA-22: uctan uca govde-dims cevabi (eksik -> sor, "160x100x45" -> isle, tekrar sorma)
+$d = New-QADir "T-QA-22"
+try {
+  $pipe = Join-Path $Root (Join-Path "engine" "Invoke-Pipeline.ps1")
+  $pd = Join-Path $d "proj"
+  $pr = "Duvar kalinligi 3 mm olan kutu yap."
+  $o1txt = & $pipe -Prompt $pr -ProjectName "qa22" -ProjectDir $pd 2>&1 | Out-String
+  $o1 = $o1txt | ConvertFrom-Json
+  $q1ids = @(@($o1.questions) | ForEach-Object { [string]$_.question_id })
+  $s1ok = ([string]$o1.status -eq "NEEDS_INPUT" -and ($q1ids -contains "body-dims"))
+  $a1 = [pscustomobject]@{}
+  $a1 | Add-Member -NotePropertyName "body-dims" -NotePropertyValue "160x100x45"
+  $a1 | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $d "a1.json") -Encoding UTF8
+  $o2txt = & $pipe -Prompt $pr -ProjectName "qa22" -ProjectDir $pd -AnswersFile (Join-Path $d "a1.json") 2>&1 | Out-String
+  $o2 = $o2txt | ConvertFrom-Json
+  $q2ids = @(@($o2.questions) | ForEach-Object { [string]$_.question_id })
+  $sp2 = Get-Content -LiteralPath (Join-Path $pd "spec.json") -Raw | ConvertFrom-Json
+  $bb = $sp2.components[0].base
+  $errs2 = ""
+  if ($o2.errors) { $errs2 = @($o2.errors) -join " " }
+  $s2ok = (($errs2 -notmatch "Cevap islenemedi") -and ($q2ids -notcontains "body-dims") -and [double]$bb.width_mm -eq 160 -and [double]$bb.depth_mm -eq 100 -and [double]$bb.height_mm -eq 45)
+  $a2 = [pscustomobject]@{}
+  $a2 | Add-Member -NotePropertyName "body-dims" -NotePropertyValue "160x100x45"
+  $a2 | Add-Member -NotePropertyName "body-hollow_top" -NotePropertyValue "kapali"
+  $a2 | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $d "a2.json") -Encoding UTF8
+  $o3txt = & $pipe -Prompt $pr -ProjectName "qa22" -ProjectDir $pd -AnswersFile (Join-Path $d "a2.json") 2>&1 | Out-String
+  $o3 = $o3txt | ConvertFrom-Json
+  $stlOk = Test-Path -LiteralPath (Join-Path $pd (Join-Path "output" "body.stl"))
+  $s3ok = ([string]$o3.status -eq "PASS" -and $stlOk)
+  $ok = ($s1ok -and $s2ok -and $s3ok)
+  Add-QAResult "T-QA-22" $ok $(if ($ok) { "eksik soruldu, cevap islendi, PASS" } else { "s1=$s1ok s2=$s2ok s3=$s3ok errs=$errs2" })
+} catch { Add-QAResult "T-QA-22" $false $_.Exception.Message }
 finally { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
 
 $passed = @($results | Where-Object { $_.result -eq "PASS" }).Count

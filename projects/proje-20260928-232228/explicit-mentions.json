@@ -1,0 +1,35 @@
+﻿{
+    "mentions":  [
+                     {
+                         "id":  "m1",
+                         "kind":  "triple",
+                         "raw":  "50 × 50 × 10",
+                         "span_start":  0,
+                         "span_length":  12,
+                         "value":  [
+                                       50,
+                                       50,
+                                       10
+                                   ],
+                         "unit":  "mm"
+                     },
+                     {
+                         "id":  "m2",
+                         "kind":  "measure",
+                         "raw":  "10 mm",
+                         "span_start":  37,
+                         "span_length":  5,
+                         "value":  10,
+                         "unit":  "mm"
+                     },
+                     {
+                         "id":  "m3",
+                         "kind":  "measure",
+                         "raw":  "15 mm",
+                         "span_start":  76,
+                         "span_length":  5,
+                         "value":  15,
+                         "unit":  "mm"
+                     }
+                 ]
+}

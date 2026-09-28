@@ -1,0 +1,55 @@
+﻿{
+    "facts":  [
+                  {
+                      "factType":  "dimension",
+                      "target":  "body",
+                      "property":  "width",
+                      "value":  50,
+                      "unit":  "mm",
+                      "source":  "50 × 50 × 10",
+                      "confidence":  1,
+                      "mention_id":  "m1"
+                  },
+                  {
+                      "factType":  "dimension",
+                      "target":  "body",
+                      "property":  "depth",
+                      "value":  50,
+                      "unit":  "mm",
+                      "source":  "50 × 50 × 10",
+                      "confidence":  1,
+                      "mention_id":  "m1"
+                  },
+                  {
+                      "factType":  "dimension",
+                      "target":  "body",
+                      "property":  "height",
+                      "value":  10,
+                      "unit":  "mm",
+                      "source":  "50 × 50 × 10",
+                      "confidence":  1,
+                      "mention_id":  "m1"
+                  },
+                  {
+                      "factType":  "relation",
+                      "target":  "body.holes",
+                      "property":  "edge_offset_mm",
+                      "value":  15,
+                      "unit":  "mm",
+                      "source":  "kenarlardan 15",
+                      "confidence":  1,
+                      "mention_id":  "m3"
+                  },
+                  {
+                      "factType":  "relation",
+                      "target":  "body.c1",
+                      "property":  "horizontal",
+                      "value":  "center",
+                      "unit":  "",
+                      "source":  "ortasında",
+                      "confidence":  1,
+                      "provenance":  "explicit",
+                      "mention_id":  null
+                  }
+              ]
+}

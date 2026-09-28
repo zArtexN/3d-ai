@@ -1,0 +1,64 @@
+{
+  "overhang": {
+    "max_angle_deg": 45,
+    "note": "Most FDM printers handle up to 45° without support. Printer and material dependent.",
+    "recommendation": "Design self-supporting angles where possible"
+  },
+  "bridging": {
+    "max_span_mm": "UNKNOWN",
+    "note": "Depends heavily on material, speed, and cooling. PLA typically bridges better than PETG.",
+    "recommendation": "Keep bridges short. Add supports for spans > 10mm if quality critical."
+  },
+  "wall_thickness": {
+    "minimum_mm": "Depends on nozzle diameter",
+    "rule_of_thumb": "Minimum wall = nozzle_diameter * 2 for structural, nozzle_diameter * 1 absolute minimum",
+    "recommendation": "Use multiples of line width for best results"
+  },
+  "layer_adhesion": {
+    "note": "FDM parts are weakest between layers (Z direction). Design critical load paths along XY.",
+    "anisotropy": "Z-axis strength typically 50-75% of XY strength"
+  },
+  "tolerances": {
+    "general_fdm_mm": 0.2,
+    "note": "NEEDS_INPUT from printer calibration. Typical FDM: ±0.2mm",
+    "first_layer_elephant_foot_mm": "0.1-0.3 typical"
+  },
+  "orientation": {
+    "principle": "Orient for strength, minimum support, and best surface quality",
+    "rules": [
+      "Largest flat surface on bed for stability",
+      "Critical dimensions in XY plane where possible",
+      "Holes vertical for roundness",
+      "Load direction along layer lines, not across"
+    ]
+  },
+  "support": {
+    "when_needed": "Overhangs > 45°, bridges > 10mm, floating features",
+    "types": ["Normal", "Tree", "Organic"],
+    "removal_note": "Support removal affects surface quality"
+  },
+  "bed_adhesion": {
+    "methods": ["Brim", "Raft", "Skirt"],
+    "brim_when": "Small contact area, tall parts, ABS/Nylon",
+    "raft_when": "Severe warping, uneven bed"
+  },
+  "snap_fit": {
+    "arm_thickness_rule": "2-3mm for PLA/PETG, material dependent",
+    "deflection_note": "FDM layer orientation affects flex behavior. Print arms along their length.",
+    "stress_concentration": "Add fillets at base of snap arms to reduce stress concentration"
+  },
+  "holes": {
+    "minimum_diameter_mm": "Depends on nozzle. Generally 2x nozzle diameter minimum.",
+    "horizontal_holes": "Use teardrop shape for better bridging on top",
+    "vertical_holes": "More accurate than horizontal. Prefer vertical orientation."
+  },
+  "_provenance": {
+    "source_type": "reference",
+    "status": "guideline",
+    "printer_specific": false,
+    "filament_specific": false,
+    "may_drive_gcode": false,
+    "requires_printer_profile_for_application": true,
+    "note": "Typical FDM values (e.g. 45 deg overhang) are guidelines, never printer capabilities. No consumer may promote them to slicer parameters."
+  }
+}

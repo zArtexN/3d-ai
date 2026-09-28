@@ -1,0 +1,31 @@
+﻿{
+    "project_id":  "proje-20260928-232228",
+    "project_name":  "proje-20260928-232228",
+    "created_at":  "2026-09-28T20:23:10.5490306Z",
+    "updated_at":  "2026-09-28T20:23:10.5490306Z",
+    "prompt":  "50 × 50 × 10 mm bir plaka, ortasında 10 mm delik, delik merkezi kenarlardan 15 mm.",
+    "status":  "PASS",
+    "designspec_version":  "2.0",
+    "engine_version":  "V1.1",
+    "pipeline_version":  "V1.2",
+    "parts":  [
+                  {
+                      "id":  "body",
+                      "status":  "PASS",
+                      "bbox_min":  [
+                                       0,
+                                       0,
+                                       0
+                                   ],
+                      "bbox_max":  [
+                                       50,
+                                       50,
+                                       10
+                                   ]
+                  }
+              ],
+    "validation_status":  "PASS",
+    "assembly":  null,
+    "gcode_available":  false,
+    "gcode_note":  "NOT AVAILABLE - printer profile required"
+}

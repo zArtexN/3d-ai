@@ -1,0 +1,31 @@
+﻿{
+    "status":  "NEEDS_INPUT",
+    "stage":  "answers",
+    "provider":  "MOCK",
+    "reason":  "Cevap islenemedi: body-cutout-c1: Kesik olcusu anlasilmadi (ornek: 20x10). Girilen: 10 (ornek formata uygun cevapla tekrar soruluyor)",
+    "errors":  [
+                   "body-cutout-c1: Kesik olcusu anlasilmadi (ornek: 20x10). Girilen: 10"
+               ],
+    "questions":  [
+                      {
+                          "question_id":  "body-cutout-c1",
+                          "component":  "body",
+                          "field":  "cutouts.c1",
+                          "target":  "body.cutout.c1",
+                          "kind":  "cutout",
+                          "question":  "Kesik \u0027c1\u0027 eksikleri: olcu (ornek: 20x10 mm); yatay konum (tek sayi, ornek: 70); dikey konum (ornek: alttan 12); derinlik (ornek: derinlik 8).",
+                          "reason":  "eksik konum/olcu olmadan kesik cikarilamaz",
+                          "answer":  null,
+                          "source":  null,
+                          "asked_at":  null,
+                          "displayId":  "q1",
+                          "parser":  "length",
+                          "required":  true,
+                          "priority":  1
+                      }
+                  ],
+    "parts":  [
+
+              ],
+    "gcode_available":  false
+}

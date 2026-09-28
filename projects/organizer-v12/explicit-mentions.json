@@ -1,0 +1,53 @@
+﻿{
+    "mentions":  [
+                     {
+                         "id":  "m1",
+                         "kind":  "triple",
+                         "raw":  "120x80x40",
+                         "span_start":  0,
+                         "span_length":  9,
+                         "value":  [
+                                       120,
+                                       80,
+                                       40
+                                   ],
+                         "unit":  "mm"
+                     },
+                     {
+                         "id":  "m2",
+                         "kind":  "measure",
+                         "raw":  "2 mm",
+                         "span_start":  65,
+                         "span_length":  4,
+                         "value":  2,
+                         "unit":  "mm"
+                     },
+                     {
+                         "id":  "m3",
+                         "kind":  "measure",
+                         "raw":  "0.2 mm",
+                         "span_start":  150,
+                         "span_length":  6,
+                         "value":  0.2,
+                         "unit":  "mm"
+                     },
+                     {
+                         "id":  "m4",
+                         "kind":  "measure",
+                         "raw":  "5 mm",
+                         "span_start":  179,
+                         "span_length":  4,
+                         "value":  5,
+                         "unit":  "mm"
+                     },
+                     {
+                         "id":  "m5",
+                         "kind":  "measure",
+                         "raw":  "15 mm",
+                         "span_start":  236,
+                         "span_length":  5,
+                         "value":  15,
+                         "unit":  "mm"
+                     }
+                 ]
+}

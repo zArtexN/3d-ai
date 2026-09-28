@@ -9,13 +9,13 @@ height = 5;
 $fn = 96;  // dairesel yuzey cozunurlugu (bbox dogrulugu icin)
 hole_h1_dia = 5;
 hole_h1_x = 15;
-hole_h1_y = 20;
+hole_h1_y = 15;
 hole_h2_dia = 5;
 hole_h2_x = 105;
-hole_h2_y = 20;
+hole_h2_y = 15;
 
 // ============ GEOMETRY + BOOLEAN OPERATIONS ============
-difference() { cube([119.6, 79.6, 5]); translate([15, 20, -1]) cylinder(d = 5, h = 7); translate([105, 20, -1]) cylinder(d = 5, h = 7); }
+difference() { cube([119.6, 79.6, 5]); translate([15, 15, -1]) cylinder(d = 5, h = 7); translate([105, 15, -1]) cylinder(d = 5, h = 7); }
 
 // ============ ASSEMBLY / NOTLAR ============
 // NOT: assembly metadata: validation disi (simulasyon yok)

@@ -1,0 +1,50 @@
+﻿{
+    "project_name":  "proje-20260928-232551",
+    "prompt":  "60x25x12 mm masaüstü kablo tutucu oluştur.\r\n\r\n3 adet kablo kanalı olsun.\r\nHer kanalın çapı 6 mm olsun.\r\nKanallar üstten açık olsun.\r\nTaban kalınlığı 3 mm olsun.\r\nYan duvarlar yaklaşık 3 mm kalınlığında olsun.\r\n\r\nKanallar uzunluk boyunca sıralansın ve birbirlerinden eşit aralıklarla yerleştirilsin.\r\n\r\nKritik ölçüler:\r\nuzunluk 60 mm\r\ngenişlik 25 mm\r\nyükseklik 12 mm\r\nkanal çapı 6 mm\r\ntaban kalınlığı 3 mm\r\nkanal sayısı 3\r\n\r\nFDM 3D baskıya uygun, basit ve sağlam bir geometri oluştur.\r\nKritik ölçüleri tahmin etme; belirtilmeyen kritik ölçüler varsa önce sor.",
+    "metadata":  {
+                     "spec_version":  "2.0"
+                 },
+    "components":  [
+                       {
+                           "id":  "body",
+                           "label":  "ana govde",
+                           "base":  {
+                                        "shape":  "box",
+                                        "width_mm":  60,
+                                        "depth_mm":  25,
+                                        "height_mm":  12
+                                    },
+                           "hollow":  {
+                                          "wall_mm":  3,
+                                          "open_top":  true,
+                                          "bottom_thickness_mm":  3
+                                      },
+                           "holes":  [
+
+                                     ],
+                           "cutouts":  [
+                                           {
+                                               "id":  "c1",
+                                               "kind":  "slot",
+                                               "face":  "top",
+                                               "pos_x_mm":  null,
+                                               "pos_y_mm":  null,
+                                               "width_mm":  null,
+                                               "length_mm":  null,
+                                               "depth_mm":  null,
+                                               "status":  "missing"
+                                           }
+                                       ],
+                           "edge_notes":  [
+
+                                          ],
+                           "transforms":  [
+
+                                          ],
+                           "tolerance":  null,
+                           "expected_bbox":  null
+                       }
+                   ],
+    "assembly":  null,
+    "material":  null
+}
