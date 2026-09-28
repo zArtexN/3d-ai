@@ -29,11 +29,14 @@ $low = $Prompt.ToLowerInvariant() -replace ([char]0x307), ""
 $low = [regex]::Replace($low, '(\d+(?:[.,]\d+)?)\s*cm\b', { param($m) ((Get-FNum $m.Groups[1].Value) * 10).ToString() + " mm" })
 
 $facts = New-Object System.Collections.Generic.List[object]
-function Add-Fact($type, $target, $prop, $val, $unit, $src) {
-  $facts.Add([pscustomobject]@{
+function Add-Fact($type, $target, $prop, $val, $unit, $src, $prov = "", $dfrom = @()) {
+  $f = [pscustomobject]@{
     factType = $type; target = $target; property = $prop
     value = $val; unit = $unit; source = $src; confidence = 1
-  })
+  }
+  if ($prov -ne "") { $f | Add-Member -NotePropertyName "provenance" -NotePropertyValue $prov -Force }
+  if (@($dfrom).Count -gt 0) { $f | Add-Member -NotePropertyName "derived_from" -NotePropertyValue @($dfrom) -Force }
+  $facts.Add($f)
 }
 
 $sepRx = '[xX\*\u00d7\u2715\u2716\u2a2f]|çarp[i\u0131]'
@@ -61,7 +64,7 @@ else {
 $stemIdxs = @()
 foreach ($smx in [regex]::Matches($low, 'deli[k\u011fg]\w*')) { $stemIdxs += $smx.Index }
 $bestAdet = $null; $bestAdetDist = 999999
-foreach ($amx in [regex]::Matches($low, '(\d+)\s*adet')) {
+foreach ($amx in [regex]::Matches($low, '(\d+)\s*(?:adet|tane)')) {
   foreach ($si in $stemIdxs) {
     $ddd = [Math]::Abs($amx.Index - $si)
     if ($ddd -lt $bestAdetDist -and $ddd -le 60) { $bestAdetDist = $ddd; $bestAdet = $amx }
@@ -75,14 +78,54 @@ else {
 }
 if ($low -match "ge[c\u00e7]i[s\u015f]li|ge[c\u00e7]sin\w*") { Add-Fact "feature" "body.holes" "hole_type" "through" "" $Matches[0].Trim() }
 $bestEo = $null; $bestEoDist = 999999
-foreach ($emx in [regex]::Matches($low, '(?:kenar(?:lardan|dan)|k[o\u00f6][s\u015f]e\w*den)\s*(\d+(?:[.,]\d+)?)')) {
+foreach ($emx in [regex]::Matches($low, '(?:kenar(?:lardan|dan)|kenar\s*pay[i\u0131]|k[o\u00f6][s\u015f]e\w*den)\s*(\d+(?:[.,]\d+)?)')) {
   foreach ($si in $stemIdxs) {
     $ddd = [Math]::Abs($emx.Index - $si)
     if ($ddd -lt $bestEoDist -and $ddd -le 60) { $bestEoDist = $ddd; $bestEo = $emx }
   }
 }
 if ($null -ne $bestEo) { Add-Fact "relation" "body.holes" "edge_offset_mm" (Get-FNum $bestEo.Groups[1].Value) "mm" $bestEo.Value.Trim() }
-if ($low -match 'k[o\u00f6][s\u015f]e|her\s*deli|simetrik') { Add-Fact "relation" "body.holes" "layout" "corner_pattern" "" $Matches[0].Trim() }
+# Yerlesim semantigi (Adim C): explicit mid-edge > explicit corner > derived corner.
+# derived tahmin degil; sayi+govde+ofset birlikteysa uretilir.
+$midExpF = $false; $midSrc = ""
+foreach ($km in [regex]::Matches($low, 'kenar\s*ortalar[i\u0131]nda|mid-edge|uzun\s*kenarlar[i\u0131]n\s*ortas[i\u0131]nda|yan\s*y[u\u00fc]zlerin\s*ortas[i\u0131]nda')) {
+  foreach ($si in $stemIdxs) {
+    if ([Math]::Abs($km.Index - $si) -le 60) { $midExpF = $true; $midSrc = $km.Value.Trim() }
+  }
+}
+$cornerExpF = $false; $cornerSrc = ""
+foreach ($km in [regex]::Matches($low, 'k[o\u00f6][s\u015f]e\w*')) {
+  foreach ($si in $stemIdxs) {
+    if ([Math]::Abs($km.Index - $si) -le 50) { $cornerExpF = $true; $cornerSrc = $km.Value.Trim() }
+  }
+}
+if ($midExpF) {
+  Add-Fact "relation" "body.holes" "layout" "mid_edge" "" $midSrc "explicit" @()
+} elseif ($cornerExpF) {
+  Add-Fact "relation" "body.holes" "layout" "corner_pattern" "" $cornerSrc "explicit" @()
+} else {
+  $offNear = $false
+  foreach ($emx in [regex]::Matches($low, '(?:kenar(?:lardan|dan)|kenar\s*pay[i\u0131]|d[i\u0131][s\u015f]\s*kenarlardan|k[o\u00f6][s\u015f]e\w*den)\s*\d')) {
+    foreach ($si in $stemIdxs) {
+      if ([Math]::Abs($emx.Index - $si) -le 60) { $offNear = $true }
+    }
+  }
+  $hn4 = $false
+  foreach ($f2 in $facts) {
+    if ([string]$f2.target -eq "body.holes" -and [string]$f2.property -eq "count" -and [int]$f2.value -eq 4) { $hn4 = $true }
+  }
+  $rectB = $false
+  $hasW = $false; $hasD = $false
+  foreach ($f2 in $facts) {
+    if ([string]$f2.target -eq "body" -and [string]$f2.property -eq "width") { $hasW = $true }
+    if ([string]$f2.target -eq "body" -and [string]$f2.property -eq "depth") { $hasD = $true }
+  }
+  if ($hasW -and $hasD) { $rectB = $true }
+  if (($offNear -or ($low -match 'her\s*deli|simetrik')) -and $hn4 -and $rectB -and $null -ne $bestEo) {
+    $eoV = (Get-FNum $bestEo.Groups[1].Value)
+    Add-Fact "relation" "body.holes" "layout" "corner_pattern" "" $bestEo.Value.Trim() "derived" @("hole_count=4", "rectangular_body", ("edge_offset=" + $eoV))
+  }
+}
 $cbm = [regex]::Match($low, '(\d+(?:[.,]\d+)?)\s*mm\s*[c\u00e7]ap[i\u0131]nda')
 if ($cbm.Success -and ($low -match "counterbore|g[o\u00f6]mme")) { Add-Fact "feature" "body.holes" "cb_dia_mm" (Get-FNum $cbm.Groups[1].Value) "mm" $cbm.Value.Trim() }
 $dbm = [regex]::Match($low, '(\d+(?:[.,]\d+)?)\s*mm\s*derinli[k\u011fg]\w*')
@@ -108,9 +151,9 @@ if ($null -ne $pmBest) {
   Add-Fact "feature" "body.c1" "width_mm" (Get-FNum $pmBest.Groups[1].Value) "mm" $pmBest.Value.Trim()
   Add-Fact "feature" "body.c1" "length_mm" (Get-FNum $pmBest.Groups[2].Value) "mm" $pmBest.Value.Trim()
 }
-if ($low -match "ortas[i\u0131]nda|ortada|merkezinde") { Add-Fact "relation" "body.c1" "horizontal" "center" "" $Matches[0].Trim() }
+if ($low -match "ortas[i\u0131]nda|ortada|merkezinde|ortalanm[i\u0131u\u00fc][s\u015f]") { Add-Fact "relation" "body.c1" "horizontal" "center" "" $Matches[0].Trim() "explicit" @() }
 $by = [regex]::Match($low, '(?:alttan\s*|tabandan\s*|alt\s*kenar(?:dan|[i\u0131]\w*)\s*(?:tabandan\s*)?)(\d+(?:[.,]\d+)?)')
-if ($by.Success) { Add-Fact "relation" "body.c1" "bottom_offset_mm" (Get-FNum $by.Groups[1].Value) "mm" $by.Value.Trim() }
+if ($by.Success) { Add-Fact "relation" "body.c1" "bottom_offset_mm" (Get-FNum $by.Groups[1].Value) "mm" $by.Value.Trim() "explicit" @() }
 
 $dv = [regex]::Match($low, '(\d+)\s*adet\s*(?:ayr[i\u0131]\s*)?b[o\u00f6]lme')
 if ($dv.Success) { Add-Fact "feature" "dividers" "count" ([int]$dv.Groups[1].Value) "adet" $dv.Value.Trim() }

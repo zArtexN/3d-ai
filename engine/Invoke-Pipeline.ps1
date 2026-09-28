@@ -332,9 +332,14 @@ $vd = Join-Path $ProjectDir "validation"
 if (Test-Path -LiteralPath $vd) {
   foreach ($f in (Get-ChildItem -LiteralPath $vd -Filter "*.validation.json")) {
     try {
+      # Stale kalinti sayilmaz (uyari olarak raporlanir; silinmez).
+      if (@($staleList) -contains ("validation/" + $f.Name)) {
+        Write-PLog $ProjectDir "validation.log" ("STALE-SKIP " + $f.Name + " (sayilmadi)")
+        continue
+      }
       $v = Get-Content -LiteralPath $f.FullName -Raw | ConvertFrom-Json
-      $pid = ([string]$f.BaseName -replace '\.validation$', '')
-      $parts.Add([pscustomobject]@{ id = $pid; status = [string]$v.status })
+      $partId = ([string]$f.BaseName -replace '\.validation$', '')
+      $parts.Add([pscustomobject]@{ id = $partId; status = [string]$v.status })
       if ($v.status -eq "BLOCKED" -or $v.status -eq "FAILED_AFTER_RETRIES" -or $v.status -eq "FAIL") { $worst = "FAILED" }
       elseif ($v.status -eq "WARNING" -and $worst -eq "PASS") { $worst = "WARNING" }
       Write-PLog $ProjectDir "validation.log" ($f.BaseName + " " + [string]$v.status)

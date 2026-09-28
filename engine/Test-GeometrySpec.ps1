@@ -102,6 +102,9 @@ foreach ($c in @($gspecObj.components)) {
     if ($null -ne $dpat.top_gap_mm -and [double]$dpat.top_gap_mm -lt 0) { $errors.Add("($cid) divider_pattern.top_gap_mm negatif olamaz") }
   }
 
+  # Adim C: cozumlulmus pattern kapsadigi deliklerin merkezini compiler uretir (gate atlar).
+  $hpOK = ($null -ne $c.hole_pattern -and ([string]$c.hole_pattern.type -eq "corner_pattern" -or [string]$c.hole_pattern.type -eq "mid_edge") -and [int]$c.hole_pattern.count -ge 1 -and $null -ne $c.hole_pattern.diameter_mm -and $null -ne $c.hole_pattern.edge_offset_mm -and $bw -gt 0 -and $bd -gt 0)
+
   foreach ($h in @($c.holes)) {
     if ($null -eq $h) { continue }
     $hid = $h.id
@@ -109,8 +112,11 @@ foreach ($c in @($gspecObj.components)) {
     $dd = [double]$h.diameter_mm
     if ($dd -lt $minHole) { $warnings.Add("WARNING: ($cid) delik '$hid' capi $dd mm < min delik $minHole mm") }
     if ($h.status -eq "missing" -or $null -eq $h.center_x_mm -or $null -eq $h.center_y_mm) {
-      $errors.Add("($cid) delik '$hid': merkez kritik olcu eksik (status=missing) -> model olusturulamaz"); continue
+      if (-not ($hpOK -and $null -ne $h.placement)) { $errors.Add("($cid) delik '$hid': merkez kritik olcu eksik (status=missing) -> model olusturulamaz"); continue }
     }
+    # Pattern kapsiyor ve merkez henuz bos: compiler cozuyor; merkez-bagimli
+    # kontroller (eksen-disi konum) atlanir, merkezsiz kontroller calisir.
+    $deferC = ($hpOK -and $null -ne $h.placement -and ($null -eq $h.center_x_mm -or $null -eq $h.center_y_mm))
     if ($h.axis -and $h.axis -ne "z") { $errors.Add("($cid) delik '$hid': su an sadece z ekseni desteklenir"); continue }
     $ht = "through"; if ($h.hole_type) { $ht = [string]$h.hole_type }
     if ($ht -eq "blind") {
@@ -119,7 +125,7 @@ foreach ($c in @($gspecObj.components)) {
     }
     if (($ht -eq "countersink") -and ($null -eq $h.cs_dia_mm -or $null -eq $h.cs_depth_mm)) { $errors.Add("($cid) delik '$hid': countersink olculeri eksik") }
     if (($ht -eq "counterbore") -and ($null -eq $h.cb_dia_mm -or $null -eq $h.cb_depth_mm)) { $errors.Add("($cid) delik '$hid': counterbore olculeri eksik") }
-    if ($shape -eq "box" -and $bw -gt 0 -and $bd -gt 0) {
+    if ($shape -eq "box" -and $bw -gt 0 -and $bd -gt 0 -and -not $deferC) {
       $rr = $dd / 2
       $cx = [double]$h.center_x_mm; $cy = [double]$h.center_y_mm
       if (($cx - $rr) -lt 0 -or ($cx + $rr) -gt $bw -or ($cy - $rr) -lt 0 -or ($cy + $rr) -gt $bd) {
@@ -131,17 +137,19 @@ foreach ($c in @($gspecObj.components)) {
   foreach ($t in @($c.cutouts)) {
     if ($null -eq $t) { continue }
     $tid = $t.id
-    if ($t.status -eq "missing" -or $null -eq $t.width_mm -or $null -eq $t.length_mm -or $null -eq $t.depth_mm -or $null -eq $t.pos_x_mm -or $null -eq $t.pos_y_mm) {
+    $twPen = ([string]$t.penetration -eq "through_wall")
+    if ($t.status -eq "missing" -or $null -eq $t.width_mm -or $null -eq $t.length_mm -or ($null -eq $t.depth_mm -and -not $twPen) -or $null -eq $t.pos_x_mm -or $null -eq $t.pos_y_mm) {
       $errors.Add("($cid) kesik '$tid': olcu/konum eksik (status=missing) -> model olusturulamaz"); continue
     }
-    if ([double]$t.width_mm -le 0 -or [double]$t.length_mm -le 0 -or [double]$t.depth_mm -le 0) { $errors.Add("($cid) kesik '$tid': olculer pozitif olmali"); continue }
+    if ([double]$t.width_mm -le 0 -or [double]$t.length_mm -le 0 -or ($null -ne $t.depth_mm -and [double]$t.depth_mm -le 0)) { $errors.Add("($cid) kesik '$tid': olculer pozitif olmali"); continue }
+    $faceBase = ([string]$t.face -replace '_short_edge$','' -replace '_long_edge$','')
     if ($shape -eq "box") {
-      if ($t.face -eq "top") {
-        if ([double]$t.pos_x_mm -lt 0 -or [double]$t.pos_y_mm -lt 0 -or ([double]$t.pos_x_mm + [double]$t.width_mm) -gt $bw -or ([double]$t.pos_y_mm + [double]$t.length_mm) -gt $bd -or [double]$t.depth_mm -gt $bh) {
+      if ($faceBase -eq "top") {
+        if ([double]$t.pos_x_mm -lt 0 -or [double]$t.pos_y_mm -lt 0 -or ([double]$t.pos_x_mm + [double]$t.width_mm) -gt $bw -or ([double]$t.pos_y_mm + [double]$t.length_mm) -gt $bd -or ($null -ne $t.depth_mm -and [double]$t.depth_mm -gt $bh)) {
           $errors.Add("($cid) kesik '$tid': govde disina tasiyor")
         }
-      } elseif ($t.face -eq "front" -or $t.face -eq "rear") {
-        if ([double]$t.pos_x_mm -lt 0 -or ([double]$t.pos_x_mm + [double]$t.width_mm) -gt $bw -or [double]$t.pos_y_mm -lt 0 -or ([double]$t.pos_y_mm + [double]$t.length_mm) -gt $bh -or [double]$t.depth_mm -gt $bd) {
+      } elseif ($faceBase -eq "front" -or $faceBase -eq "rear") {
+        if ([double]$t.pos_x_mm -lt 0 -or ([double]$t.pos_x_mm + [double]$t.width_mm) -gt $bw -or [double]$t.pos_y_mm -lt 0 -or ([double]$t.pos_y_mm + [double]$t.length_mm) -gt $bh -or ($null -ne $t.depth_mm -and [double]$t.depth_mm -gt $bd)) {
           $errors.Add("($cid) kesik '$tid': govde disina tasiyor")
         }
       } else { $errors.Add("($cid) kesik '$tid': yuz top/front/rear olmali") }

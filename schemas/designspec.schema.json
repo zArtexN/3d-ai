@@ -91,6 +91,20 @@
             }
           },
           "tolerance": { "type": ["object", "null"], "properties": { "type": { "type": "string" }, "clearance_mm": { "type": ["number", "null"] }, "fit_to": { "type": ["string", "null"] }, "status": { "enum": ["ok", "missing"] } } },
+          "hole_pattern": {
+            "type": ["object", "null"],
+            "description": "v2.1: semantic delik yerlesimi (compiler deterministik uretir).",
+            "properties": {
+              "type": { "type": ["string", "null"], "enum": ["corner_pattern", "mid_edge", null] },
+              "count": { "type": ["integer", "null"] },
+              "diameter_mm": { "type": ["number", "null"] },
+              "edge_offset_mm": { "type": ["number", "null"] },
+              "depth": { "type": ["object", "null"] },
+              "placement": { "type": ["object", "null"] },
+              "provenance": { "type": ["string", "null"], "enum": ["explicit", "derived", null] },
+              "derived_from": { "type": "array", "items": { "type": "string" } }
+            }
+          },
           "divider_pattern": {
             "type": ["object", "null"],
             "description": "v2.1: govde-ici bolmeler (bagimsiz component degil). Ic olculer govdeden turetilir.",

@@ -79,6 +79,7 @@ foreach ($f in $facts) {
     if ($p -eq "hole_type") { foreach ($h in $hs) { if ([string]$h.hole_type -eq [string]$v) { $ok = $true } } }
     if ($p -eq "edge_offset_mm") { foreach ($h in $hs) { if (Num-Eq $h.edge_offset_mm $v) { $ok = $true } } }
     if ($p -eq "layout" -and [string]$v -eq "corner_pattern") { foreach ($h in $hs) { if ($null -ne $h.placement -and [string]$h.placement.type -eq "corner_pattern") { $ok = $true } } }
+    if ($p -eq "layout" -and [string]$v -eq "mid_edge") { foreach ($h in $hs) { if ($null -ne $h.placement -and [string]$h.placement.type -eq "mid_edge") { $ok = $true } } }
     if ($p -eq "cb_dia_mm") { foreach ($h in $hs) { if (Num-Eq $h.cb_dia_mm $v) { $ok = $true } } }
     if ($p -eq "cb_depth_mm") { foreach ($h in $hs) { if (Num-Eq $h.cb_depth_mm $v) { $ok = $true } } }
   } elseif ($t -eq "body.c1") {
@@ -87,7 +88,7 @@ foreach ($f in $facts) {
     if ($null -ne $b) { $t1 = @(@($b.cutouts) | Where-Object { $_ -ne $null } | Select-Object -First 1) }
     if ($null -ne $t1) {
       if (($p -eq "width_mm" -and (Num-Eq $t1.width_mm $v)) -or ($p -eq "length_mm" -and (Num-Eq $t1.length_mm $v)) -or ($p -eq "bottom_offset_mm" -and (Num-Eq $t1.pos_y_mm $v))) { $ok = $true }
-      if ($p -eq "horizontal" -and [string]$v -eq "center" -and $null -ne $t1.placement -and [string]$t1.placement.type -eq "edge_centered") { $ok = $true }
+      if ($p -eq "horizontal" -and [string]$v -eq "center" -and $null -ne $t1.placement -and ([string]$t1.placement.type -eq "edge_centered" -or [string]$t1.placement.type -eq "centered")) { $ok = $true }
     }
   } elseif ($t -eq "dividers") {
     $b0 = Get-Comp "body"

@@ -30,6 +30,8 @@ $ErrorActionPreference = "Stop"
 
 # Adim B: ortak olcu cozucu (saf kutuphane; param blogu yok, scope kirletmez).
 . (Join-Path $PSScriptRoot "MeasureParser.ps1")
+# Adim C: delik yerlesim matematigi (tek deterministik kaynak; parser tahmin etmez).
+. (Join-Path $PSScriptRoot "HoleLayout.ps1")
 # Claim kaydi: bir mention yalnizca bir anahtar kelimeye atanir (ArrayList; @() kullanma).
 $mpClaimed = New-Object System.Collections.ArrayList
 
@@ -218,7 +220,7 @@ if ($null -ne $diaVal) {
     $stemIdx2 = -1
     $stemM2 = [regex]::Match($low, $holeStemRx)
     if ($stemM2.Success) { $stemIdx2 = $stemM2.Index }
-    foreach ($emc in [regex]::Matches($low, '(?:kenar(?:lardan|dan)|k[o\u00f6][s\u015f]e\w*den|iki\s*kenardan)\s*(\d+(?:[.,]\d+)?)')) {
+    foreach ($emc in [regex]::Matches($low, '(?:kenar(?:lardan|dan)|kenar\s*pay[i\u0131]|k[o\u00f6][s\u015f]e\w*den|iki\s*kenardan)\s*(\d+(?:[.,]\d+)?)')) {
       $dd = 0
       if ($stemIdx2 -ge 0) { $dd = [Math]::Abs($emc.Index - $stemIdx2) }
       if ($dd -lt $bestEoDist) { $bestEoDist = $dd; $bestEo = $emc }
@@ -261,14 +263,14 @@ if ($null -ne $diaVal) {
   if ($sm.Success) { $hole.screw = $sm.Groups[1].Value.ToUpperInvariant() }
   $comp.holes = @($hole)
   $holeN = $null
-  $hmN = [regex]::Match($low, '(\d+)\s*deli[k\u011fg]\w*')
+  $hmN = [regex]::Match($low, '(?<![\d.,])(\d+)\s*deli[k\u011fg]\w*')
   if ($hmN.Success) { $holeN = [int]$hmN.Groups[1].Value }
   else {
     # "4 adet ... deligi": adet sayisini HERHANGI delik govdesine en yakin olandan al (60 karakter icinde).
     $stemIdxs = @()
     foreach ($smx in [regex]::Matches($low, $holeStemRx)) { $stemIdxs += $smx.Index }
     $bestAdet = $null; $bestAdetDist = 999999
-    foreach ($am in [regex]::Matches($low, '(\d+)\s*adet')) {
+    foreach ($am in [regex]::Matches($low, '(\d+)\s*(?:adet|tane)')) {
       foreach ($si in $stemIdxs) {
         $dd = [Math]::Abs($am.Index - $si)
         if ($dd -lt $bestAdetDist -and $dd -le 60) { $bestAdetDist = $dd; $bestAdet = [int]$am.Groups[1].Value }
@@ -330,13 +332,36 @@ if ($null -ne $diaVal) {
       $hh | Add-Member -NotePropertyName "edge_offset_mm" -NotePropertyValue $edgeOffVal -Force
     }
   }
-  # Kosegen-yerlesim (explicit geometric rule, AI tahmini DEGIL): 4 delik + kenar ofseti +
-  # govde olculeri biliniyorsa VE kose/simetri/her-delik baglami varsa dort kose deterministik
-  # yerlesir: (off,off),(w-off,off),(off,d-off),(w-off,d-off). Sigmayorsa yerlesilmez, sorulur.
+  # Semantic hole pattern (Adim C): baglam yeterliyse corner/mid-edge.
+  # Oncelik: explicit mid-edge > explicit corner > derived corner.
+  # "kenar ortalarinda/mid-edge" varken corner DERIVED edilmez; inkar cumlesi
+  # ("koselerde degil") ayri mantik gerektirmez (explicit her zaman kazanir).
+  # Koordinatlar burada TAHMIN edilmez; HoleLayout.ps1 deterministik uretir
+  # (compiler ayni fonksiyonla yeniden uretir).
   if ($null -ne $holeN -and $holeN -eq 4 -and $null -ne $edgeOffVal -and $null -ne $comp.base -and ($comp.base.shape -eq "box" -or $comp.base.shape -eq "rounded_box")) {
     $bw = 0; $bd = 0
     if ($null -ne $comp.base.width_mm) { $bw = [double]$comp.base.width_mm }
     if ($null -ne $comp.base.depth_mm) { $bd = [double]$comp.base.depth_mm }
+    $stemIdxs3 = @()
+    foreach ($smx in [regex]::Matches($low, $holeStemRx)) { $stemIdxs3 += $smx.Index }
+    $midExp = $false
+    foreach ($km in [regex]::Matches($low, 'kenar\s*ortalar[i\u0131]nda|mid-edge|uzun\s*kenarlar[i\u0131]n\s*ortas[i\u0131]nda|yan\s*y[u\u00fc]zlerin\s*ortas[i\u0131]nda')) {
+      foreach ($si in $stemIdxs3) {
+        if ([Math]::Abs($km.Index - $si) -le 60) { $midExp = $true }
+      }
+    }
+    $cornerExp = $false
+    foreach ($km in [regex]::Matches($low, 'k[o\u00f6][s\u015f]e\w*')) {
+      foreach ($si in $stemIdxs3) {
+        if ([Math]::Abs($km.Index - $si) -le 50) { $cornerExp = $true }
+      }
+    }
+    $offCtx = $false
+    foreach ($km in [regex]::Matches($low, '(?:kenar(?:lardan|dan)|kenar\s*pay[i\u0131]|d[i\u0131][s\u015f]\s*kenarlardan|k[o\u00f6][s\u015f]e\w*den)\s*\d')) {
+      foreach ($si in $stemIdxs3) {
+        if ([Math]::Abs($km.Index - $si) -le 60) { $offCtx = $true }
+      }
+    }
     $symTrig = $false
     if ($low -match "her\s*deli") { $symTrig = $true }
     elseif ($low -match "simetrik") {
@@ -345,28 +370,39 @@ if ($null -ne $diaVal) {
           if ([Math]::Abs($smx.Index - $kmx.Index) -le 50) { $symTrig = $true }
         }
       }
-    } else {
-      foreach ($smx in [regex]::Matches($low, $holeStemRx)) {
-        foreach ($kmx in [regex]::Matches($low, "k[o\u00f6][s\u015f]e")) {
-          if ([Math]::Abs($smx.Index - $kmx.Index) -le 50) { $symTrig = $true }
-        }
-      }
     }
-    if ($symTrig -and $bw -gt 0 -and $bd -gt 0) {
+    $layType = $null; $layProv = ""; $layFrom = @()
+    if ($midExp) { $layType = "mid_edge"; $layProv = "explicit"; $layFrom = @() }
+    elseif ($cornerExp) { $layType = "corner_pattern"; $layProv = "explicit"; $layFrom = @() }
+    elseif (($offCtx -or $symTrig) -and $bw -gt 0 -and $bd -gt 0) {
+      $layType = "corner_pattern"; $layProv = "derived"
+      $layFrom = @(("hole_count=" + $holeN), "rectangular_body", ("edge_offset=" + $edgeOffVal))
+    }
+    if ($null -ne $layType -and $bw -gt 0 -and $bd -gt 0) {
       $off = [double]$edgeOffVal
       $rr = 0
       if ($null -ne $hole.diameter_mm) { $rr = [double]$hole.diameter_mm / 2 }
-      $corners = @(@($off, $off, "bottom_left"), @(($bw - $off), $off, "bottom_right"), @($off, ($bd - $off), "top_left"), @(($bw - $off), ($bd - $off), "top_right"))
-      $fits = ($off -gt 0)
-      foreach ($cn in $corners) {
+      $centers = Get-PatternCenters $layType $bw $bd $off
+      $fits = ($null -ne $centers -and $off -gt 0)
+      foreach ($cn in $centers) {
         if (-not ($cn[0] - $rr -ge 0 -and $cn[0] + $rr -le $bw -and $cn[1] - $rr -ge 0 -and $cn[1] + $rr -le $bd)) { $fits = $false }
       }
       if ($fits) {
+        $comp | Add-Member -NotePropertyName "hole_pattern" -NotePropertyValue ([pscustomobject]@{
+          type = $layType; count = $holeN; diameter_mm = $hole.diameter_mm; edge_offset_mm = $off
+          depth = [pscustomobject]@{ type = $htype }
+          placement = [pscustomobject]@{ reference = "outer_body_rectangle" }
+          provenance = $layProv; derived_from = @($layFrom)
+        }) -Force
+        $posNames = @("p1", "p2", "p3", "p4")
+        if ($layType -eq "corner_pattern") { $posNames = @("bottom_left", "bottom_right", "top_left", "top_right") }
+        else { $posNames = @("bottom_mid", "top_mid", "left_mid", "right_mid") }
         $ci = 0
         foreach ($hh in @($comp.holes)) {
           if ($null -eq $hh -or $ci -ge 4) { continue }
-          $hh.center_x_mm = $corners[$ci][0]; $hh.center_y_mm = $corners[$ci][1]; $hh.status = "ok"
-          $hh | Add-Member -NotePropertyName "placement" -NotePropertyValue ([pscustomobject]@{ type = "corner_pattern"; corner = $corners[$ci][2]; edge_offset_mm = $off; rule = "deterministic: 4 symmetric corners at edge offset" }) -Force
+          if ([string]$hh.id -like "mp*") { continue }
+          $hh.center_x_mm = $centers[$ci][0]; $hh.center_y_mm = $centers[$ci][1]; $hh.status = "ok"
+          $hh | Add-Member -NotePropertyName "placement" -NotePropertyValue ([pscustomobject]@{ type = $layType; position = $posNames[$ci]; provenance = $layProv; edge_offset_mm = $off; rule = "deterministic: HoleLayout.ps1" }) -Force
           $ci++
         }
       }
@@ -434,6 +470,20 @@ if ($low -match "slot" -or $low -match "kanal" -or $low -match "kesik" -or $low 
     }
   }
   $cut.face = $bestFace
+  # Kisa/uzun kenar baglami: on/arka yuzde yuz adina islenir (edge_*); geometri ayni kalir.
+  if ($cut.face -eq "front" -or $cut.face -eq "rear") {
+    $edgeCtx = ""
+    if ($slotRefIdx -ge 0) {
+      foreach ($km in [regex]::Matches($low, 'k[i\u0131]sa\s*kenar')) {
+        if ([Math]::Abs($km.Index - $slotRefIdx) -le 50) { $edgeCtx = "short_edge" }
+      }
+      foreach ($km in [regex]::Matches($low, 'uzun\s*kenar')) {
+        if ([Math]::Abs($km.Index - $slotRefIdx) -le 50 -and $edgeCtx -eq "") { $edgeCtx = "long_edge" }
+      }
+    }
+    if ($edgeCtx -ne "") { $cut.face = [string]$cut.face + "_" + $edgeCtx }
+  }
+  $faceBase = ([string]$cut.face -replace '_short_edge$','' -replace '_long_edge$','')
   if ($null -ne $sd) { $cut.width_mm = (Get-Num $sd.Groups[1].Value); $cut.length_mm = (Get-Num $sd.Groups[2].Value) }
   else { $questions.Add("Kesik 'c1' olcusu belirtilmemis. Genişlik x yukseklik nedir? (ornek: 20x10 mm)") }
   $pm = [regex]::Match($low, 'konum\s*(\d+(?:[.,]\d+)?)\s*[,;]\s*(\d+(?:[.,]\d+)?)')
@@ -443,7 +493,10 @@ if ($low -match "slot" -or $low -match "kanal" -or $low -match "kesik" -or $low 
     # "soldan 5 mm" -> pos_x (dogrudan referans). "tabandan" taban-kalinligi degildir (tam-kelime).
     # Ustten/sagdan hesaplanmaz (yon belirsizligi); eksikse soru sorulur (uydurulmaz).
     $by = [regex]::Match($low, '(?:alttan\s*|tabandan\s*|alt\s*kenar(?:dan|[i\u0131]\w*)\s*(?:tabandan\s*)?)(\d+(?:[.,]\d+)?)')
-    if ($by.Success) { $cut.pos_y_mm = (Get-Num $by.Groups[1].Value) }
+    if ($by.Success) {
+      $cut.pos_y_mm = (Get-Num $by.Groups[1].Value)
+      $cut | Add-Member -NotePropertyName "vertical" -NotePropertyValue ([pscustomobject]@{ type = "edge_offset"; reference = "bottom"; value = (Get-Num $by.Groups[1].Value); provenance = "explicit" }) -Force
+    }
     $bx = [regex]::Match($low, 'soldan\s*(\d+(?:[.,]\d+)?)')
     if ($bx.Success) { $cut.pos_x_mm = (Get-Num $bx.Groups[1].Value) }
     $questions.Add("Kesigin konumu ve derinligi nedir? (ornek: konum 5,5 derinlik 8)")
@@ -453,10 +506,10 @@ if ($low -match "slot" -or $low -match "kanal" -or $low -match "kesik" -or $low 
   # 2) yan-yuz kesigi duvari deler -> penetration through_wall, depth = duvar kalinligi.
   $bw2 = 0
   if ($null -ne $comp.base -and $null -ne $comp.base.width_mm) { $bw2 = [double]$comp.base.width_mm }
-  if ($null -eq $cut.pos_x_mm -and $null -ne $cut.width_mm -and $bw2 -gt 0 -and ($cut.face -eq "front" -or $cut.face -eq "rear")) {
+  if ($null -eq $cut.pos_x_mm -and $null -ne $cut.width_mm -and $bw2 -gt 0 -and ($faceBase -eq "front" -or $faceBase -eq "rear")) {
     $centered = $false
     foreach ($smx in [regex]::Matches($low, $slotKwRx)) {
-      foreach ($kmx in [regex]::Matches($low, "ortas[i\u0131]nda|ortada|merkezinde")) {
+      foreach ($kmx in [regex]::Matches($low, "ortas[i\u0131]nda|ortada|merkezinde|ortalanm[i\u0131u\u00fc][s\u015f]")) {
         if ([Math]::Abs($smx.Index - $kmx.Index) -le 50) { $centered = $true }
       }
     }
@@ -464,24 +517,33 @@ if ($low -match "slot" -or $low -match "kanal" -or $low -match "kesik" -or $low 
       $px = ($bw2 - [double]$cut.width_mm) / 2
       if ($px -ge 0 -and ($px + [double]$cut.width_mm) -le $bw2) {
         $cut.pos_x_mm = $px
-        $edgeName = [string]$cut.face + "_edge"
+        $edgeBase = ([string]$cut.face -replace '_short_edge$','' -replace '_long_edge$','')
+        $edgeName = $edgeBase + "_edge"
         foreach ($smx in [regex]::Matches($low, $slotKwRx)) {
           foreach ($kmx in [regex]::Matches($low, "k[i\u0131]sa\s*kenar")) {
-            if ([Math]::Abs($smx.Index - $kmx.Index) -le 50) { $edgeName = [string]$cut.face + "_short_edge" }
+            if ([Math]::Abs($smx.Index - $kmx.Index) -le 50) { $edgeName = $edgeBase + "_short_edge" }
           }
           foreach ($kmx in [regex]::Matches($low, "uzun\s*kenar")) {
-            if ([Math]::Abs($smx.Index - $kmx.Index) -le 50) { $edgeName = [string]$cut.face + "_long_edge" }
+            if ([Math]::Abs($smx.Index - $kmx.Index) -le 50) { $edgeName = $edgeBase + "_long_edge" }
           }
         }
-        $cut | Add-Member -NotePropertyName "placement" -NotePropertyValue ([pscustomobject]@{ type = "edge_centered"; edge = $edgeName; horizontal = "center"; rule = "deterministic: (body_width - cut_width)/2" }) -Force
+        $cut | Add-Member -NotePropertyName "placement" -NotePropertyValue ([pscustomobject]@{ type = "centered"; edge = $edgeName; horizontal = "center"; provenance = "explicit"; rule = "deterministic: (body_width - cut_width)/2" }) -Force
       }
     }
   }
-  if ($null -eq $cut.depth_mm -and ($cut.face -eq "front" -or $cut.face -eq "rear") -and $null -ne $comp.hollow -and $null -ne $comp.hollow.wall_mm -and [double]$comp.hollow.wall_mm -gt 0) {
+  # Acik through-wall ifadesi: "through-wall" / "duvari tamamen kes" (slot yakininda).
+  $twExp = $false
+  foreach ($twm in [regex]::Matches($low, 'through-wall|duvar[i\u0131]\s*tamamen\s*kes\w*|duvar[i\u0131]\s*delip\s*ge[c\u00e7]\w*')) {
+    if ($slotRefIdx -ge 0 -and [Math]::Abs($twm.Index - $slotRefIdx) -le 60) { $twExp = $true }
+  }
+  if ($twExp -and [string]$cut.penetration -ne "through_wall") {
+    $cut | Add-Member -NotePropertyName "penetration" -NotePropertyValue "through_wall" -Force
+  }
+  if ($null -eq $cut.depth_mm -and ($faceBase -eq "front" -or $faceBase -eq "rear") -and $null -ne $comp.hollow -and $null -ne $comp.hollow.wall_mm -and [double]$comp.hollow.wall_mm -gt 0) {
     $cut.depth_mm = [double]$comp.hollow.wall_mm
     $cut | Add-Member -NotePropertyName "penetration" -NotePropertyValue "through_wall" -Force
   }
-  $depthOk = ($null -ne $cut.depth_mm)
+  $depthOk = ($null -ne $cut.depth_mm -or [string]$cut.penetration -eq "through_wall")
   if ($null -ne $cut.width_mm -and $null -ne $cut.length_mm -and $null -ne $cut.pos_x_mm -and $null -ne $cut.pos_y_mm -and $depthOk) { $cut.status = "ok" }
   $comp.cutouts = @($cut)
 }
@@ -591,7 +653,7 @@ else {
     else {
       # Isim-oncesi form: "2 adet, 2 mm kalinliginda ... bolme" -> bolmeye en yakin adet.
       $bestDiv = $null; $bestDivDist = 999999
-      foreach ($am in [regex]::Matches($low, '(\d+)\s*adet')) {
+    foreach ($am in [regex]::Matches($low, '(\d+)\s*(?:adet|tane)')) {
         foreach ($bm in [regex]::Matches($low, 'b[o\u00f6]lme')) {
           $ddd = [Math]::Abs($am.Index - $bm.Index)
           if ($ddd -lt $bestDivDist -and $ddd -le 80) { $bestDivDist = $ddd; $bestDiv = [int]$am.Groups[1].Value }

@@ -22,6 +22,8 @@ $ErrorActionPreference = "Stop"
 $EngineDir = $PSScriptRoot
 $Root = Split-Path -Parent $EngineDir
 . (Join-Path $EngineDir "Geometry.ps1")
+# Adim C: delik yerlesim matematigi (compiler uretimi; tek kaynak).
+. (Join-Path $EngineDir "HoleLayout.ps1")
 
 function Get-GSettings {
   $p = Join-Path $Root "settings.json"
@@ -146,6 +148,35 @@ foreach ($c in @($gspecObj.components)) {
 
     $cuts = New-Object System.Collections.Generic.List[object]
 
+    # --- semantic hole pattern cozumu (Adim C): compiler deterministik uretir ---
+    # Parser degerlerini korur; bos ya da derived-isaretli merkezleri pattern'den doldurur.
+    $hp = $c.hole_pattern
+    if ($null -ne $hp -and ([string]$hp.type -eq "corner_pattern" -or [string]$hp.type -eq "mid_edge") -and ($shape -eq "box" -or $shape -eq "rounded_box")) {
+      $hw = [double]$b.width_mm; $hd = [double]$b.depth_mm
+      $ho = 0; if ($null -ne $hp.edge_offset_mm) { $ho = [double]$hp.edge_offset_mm }
+      $hcn = 0; if ($null -ne $hp.count) { $hcn = [int]$hp.count }
+      if ($hw -gt 0 -and $hd -gt 0 -and $ho -gt 0 -and $hcn -ge 1) {
+        $cc2 = Get-PatternCenters ([string]$hp.type) $hw $hd $ho
+        if ($null -ne $cc2) {
+          $ci2 = 0
+          foreach ($ph in @($c.holes)) {
+            if ($null -eq $ph) { continue }
+            if ([string]$ph.id -like "mp*") { continue }
+            if ($ci2 -ge $cc2.Count) { break }
+            $needFill = ($null -eq $ph.center_x_mm -or $null -eq $ph.center_y_mm)
+            $isDerived = ($null -ne $ph.placement -and [string]$ph.placement.provenance -eq "derived")
+            if ($needFill -or $isDerived) {
+              $ph.center_x_mm = $cc2[$ci2][0]; $ph.center_y_mm = $cc2[$ci2][1]; $ph.status = "ok"
+              if ($null -eq $ph.placement) {
+                $ph | Add-Member -NotePropertyName "placement" -NotePropertyValue ([pscustomobject]@{ type = [string]$hp.type; provenance = "derived" }) -Force
+              }
+            }
+            $ci2++
+          }
+        }
+      }
+    }
+
     # --- hollow ---
     if ($null -ne $c.hollow) {
       $hb = New-GHollowBox $ew $ed $hh ([double]$c.hollow.wall_mm) ([bool]$c.hollow.open_top) $c.hollow.bottom_thickness_mm
@@ -176,7 +207,13 @@ foreach ($c in @($gspecObj.components)) {
         $gs = New-GSlot ([double]$t.pos_x_mm) ([double]$t.pos_y_mm) ([double]$t.length_mm) ([double]$t.width_mm) $hh ([double]$t.depth_mm)
         $cuts.Add($gs)
       } else {
-        $gc = New-GCutout ([string]$t.face) ([double]$t.pos_x_mm) ([double]$t.pos_y_mm) ([double]$t.width_mm) ([double]$t.length_mm) ([double]$t.depth_mm) $ww $dd $hh
+        $faceBase = ([string]$t.face -replace '_short_edge$','' -replace '_long_edge$','')
+        $useDepth = $t.depth_mm
+        if ($null -eq $useDepth -and [string]$t.penetration -eq "through_wall") {
+          if ($null -ne $c.hollow -and $null -ne $c.hollow.wall_mm) { $useDepth = [double]$c.hollow.wall_mm }
+          else { throw ("kesik '" + [string]$t.id + "': through_wall icin duvar kalinligi gerekli (derinlik cikarilamadi)") }
+        }
+        $gc = New-GCutout $faceBase ([double]$t.pos_x_mm) ([double]$t.pos_y_mm) ([double]$t.width_mm) ([double]$t.length_mm) ([double]$useDepth) $ww $dd $hh
         $cuts.Add($gc)
       }
       $paramLines.Add("cut_" + [string]$t.id + "_w = " + (Format-Num ([double]$t.width_mm)) + ";")
@@ -276,8 +313,17 @@ foreach ($c in @($gspecObj.components)) {
       $stl = Join-Path $outDir ($cid + ".stl")
       $baseArgs = @{ Stl = $stl; ExpMinX = [double]$expMin[0]; ExpMinY = [double]$expMin[1]; ExpMinZ = [double]$expMin[2]; ExpMaxX = [double]$expMax[0]; ExpMaxY = [double]$expMax[1]; ExpMaxZ = [double]$expMax[2] }
       $throughHoles = @(@($c.holes) | Where-Object { $_ -and (-not $_.hole_type -or [string]$_.hole_type -eq "through" -or [string]$_.hole_type -eq "clearance") })
+      $blindHoles = @(@($c.holes) | Where-Object { $_ -and [string]$_.hole_type -eq "blind" })
+      # Cikis duzlemi: hollow+acik govdede delik tabanda biter (floor);
+      # kapali/hollow-olmayan parcalarda parca tepesi (mevcut davranis).
+      $exitZ = [double]$expMax[2]
+      if ($null -ne $c.hollow -and $c.hollow.open_top -eq $true -and $null -ne $c.hollow.wall_mm) {
+        $btX = $null
+        if ($null -ne $c.hollow.bottom_thickness_mm) { $btX = $c.hollow.bottom_thickness_mm }
+        $exitZ = Get-HollowFloor ([double]$c.hollow.wall_mm) $btX
+      }
       $worst = "PASS"
-      if ($throughHoles.Count -eq 0) {
+      if ($throughHoles.Count -eq 0 -and $blindHoles.Count -eq 0) {
         $res = Run-GVerify $baseArgs
         $lastVerify = $res.text
         if ($res.code -ne 0) { $worst = "FAIL" } elseif ($lastVerify -match "WARNING") { $worst = "WARNING" }
@@ -288,6 +334,23 @@ foreach ($c in @($gspecObj.components)) {
           $hargs.HoleCX = [double]$h.center_x_mm
           $hargs.HoleCY = [double]$h.center_y_mm
           $hargs.HoleDiameter = [double]$h.diameter_mm
+          $hargs.HoleZTop = $exitZ
+          $res = Run-GVerify $hargs
+          $txt = $res.text
+          $rr2 = "PASS"; if ($res.code -ne 0) { $rr2 = "FAIL" } elseif ($txt -match "WARNING") { $rr2 = "WARNING" }
+          $holeChecks += [pscustomobject]@{ id = [string]$h.id; result = $rr2 }
+          if ($rr2 -eq "FAIL") { $worst = "FAIL" } elseif ($rr2 -eq "WARNING" -and $worst -eq "PASS") { $worst = "WARNING" }
+          $lastVerify = $txt
+        }
+        foreach ($h in $blindHoles) {
+          # Kor delik: giris parca tepesinde, dip delik tabaninda aranir.
+          $hargs = $baseArgs.Clone()
+          $hargs.CheckHole = $true
+          $hargs.HoleCX = [double]$h.center_x_mm
+          $hargs.HoleCY = [double]$h.center_y_mm
+          $hargs.HoleDiameter = [double]$h.diameter_mm
+          $hargs.HoleZTop = [double]$expMax[2]
+          $hargs.HoleZBottom = ([double]$expMax[2] - [double]$h.depth_mm)
           $res = Run-GVerify $hargs
           $txt = $res.text
           $rr2 = "PASS"; if ($res.code -ne 0) { $rr2 = "FAIL" } elseif ($txt -match "WARNING") { $rr2 = "WARNING" }

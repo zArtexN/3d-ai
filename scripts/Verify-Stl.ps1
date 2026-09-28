@@ -30,6 +30,8 @@ param(
   [double]$HoleCX = 0,
   [double]$HoleCY = 0,
   [double]$HoleDiameter = 0,
+  [double]$HoleZBottom = [double]::NaN,
+  [double]$HoleZTop = [double]::NaN,
   [int]$MinFacets = 1,
   [int]$WarningMinFacets = 12,
   [int]$WarningMinBytes = 1024,
@@ -55,10 +57,16 @@ function Update-BBox($x, $y, $z) {
 }
 function Update-Rim($x, $y, $z) {
   if (-not $CheckHole -or $holeR -le 0) { return }
+  # Cikis duzlemi: verilmediyse parca bbox alti/ustu (kapali parca varsayimi);
+  # hollow+acik govdede motor taban-tepesini (floor) gonderir.
+  $zB = $ExpMinZ
+  if ($HoleZBottom -eq $HoleZBottom) { $zB = $HoleZBottom }
+  $zT = $ExpMaxZ
+  if ($HoleZTop -eq $HoleZTop) { $zT = $HoleZTop }
   $dd = [math]::Sqrt(($x - $HoleCX) * ($x - $HoleCX) + ($y - $HoleCY) * ($y - $HoleCY))
   if ([math]::Abs($dd - $holeR) -le $Tolerance) {
-    if ([math]::Abs($z - $ExpMinZ) -le $Tolerance) { $script:rimBottom++ }
-    elseif ([math]::Abs($z - $ExpMaxZ) -le $Tolerance) { $script:rimTop++ }
+    if ([math]::Abs($z - $zB) -le $Tolerance) { $script:rimBottom++ }
+    elseif ([math]::Abs($z - $zT) -le $Tolerance) { $script:rimTop++ }
   }
 }
 
