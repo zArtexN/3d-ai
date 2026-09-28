@@ -49,13 +49,18 @@ try {
   $covTxt = & (Join-Path $EngineDir "Test-FactCoverage.ps1") -SpecFile $specF -FactsFile $factsF -QuestionsFile $qsF -MentionsFile $menF -AsJson 2>&1 | Out-String
   $cov = $covTxt | ConvertFrom-Json
   $un = @($cov.unconsumed)
+  $fx = @((Get-Content -LiteralPath $factsF -Raw | ConvertFrom-Json).facts)
 
-  $has25 = (@($un | Where-Object { $_ -match "\[measure\]" -and $_ -match "2\.5" }).Count -gt 0)
-  Add-UResult "T-UNC-01" $has25 $(if ($has25) { "2.5 mm duvar UNCONSUMED" } else { "yok; unconsumed=" + ($un -join "|") })
-  $has3 = (@($un | Where-Object { $_ -match "\[measure\]" -and $_ -match "\b3 mm" }).Count -gt 0)
-  Add-UResult "T-UNC-02" $has3 $(if ($has3) { "3 mm taban UNCONSUMED" } else { "yok; unconsumed=" + ($un -join "|") })
-  $has2 = (@($un | Where-Object { $_ -match "\[measure\]" -and $_ -match "\b2 mm" }).Count -gt 0)
-  Add-UResult "T-UNC-03" $has2 $(if ($has2) { "2 mm bolme-kalinligi UNCONSUMED" } else { "yok; unconsumed=" + ($un -join "|") })
+  # Adim B sonrasi beklenti: duvar/taban/bolme-kalinligi TUKETILMIS olmali.
+  $has25 = (@($un | Where-Object { $_ -match "\[measure\]" -and $_ -match "2\.5" }).Count -eq 0)
+  $wallFx = (@($fx | Where-Object { [string]$_.property -eq "wall_mm" -and [double]$_.value -eq 2.5 }).Count -gt 0)
+  Add-UResult "T-UNC-01" ($has25 -and $wallFx) ("2.5 mm duvar tuketildi (fact=" + $wallFx + ")")
+  $has3 = (@($un | Where-Object { $_ -match "\[measure\]" -and $_ -match "\b3 mm" }).Count -eq 0)
+  $botFx = (@($fx | Where-Object { [string]$_.property -eq "bottom_thickness_mm" -and [double]$_.value -eq 3 }).Count -gt 0)
+  Add-UResult "T-UNC-02" ($has3 -and $botFx) ("3 mm taban tuketildi (fact=" + $botFx + ")")
+  $has2 = (@($un | Where-Object { $_ -match "\[measure\]" -and $_ -match "\b2 mm" }).Count -eq 0)
+  $thFx = (@($fx | Where-Object { [string]$_.property -eq "thickness_mm" -and [double]$_.value -eq 2 }).Count -gt 0)
+  Add-UResult "T-UNC-03" ($has2 -and $thFx) ("2 mm bolme-kalinligi tuketildi (fact=" + $thFx + ")")
 
   $triFree = (@($un | Where-Object { $_ -match "\[triple\]" }).Count -eq 0)
   Add-UResult "T-UNC-04" $triFree $(if ($triFree) { "triple tuketilmis" } else { "asiri rapor: " + ($un -join "|") })

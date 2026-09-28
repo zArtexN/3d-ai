@@ -18,6 +18,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Adim B: ortak olcu cozucu (saf kutuphane; param blogu yok, scope kirletmez).
+. (Join-Path $PSScriptRoot "MeasureParser.ps1")
+$mpClaimedF = New-Object System.Collections.ArrayList
+
 function Get-FNum($s) { return [double]([string]$s -replace ',', '.') }
 
 $low = $Prompt.ToLowerInvariant() -replace ([char]0x307), ""
@@ -40,10 +44,10 @@ if ($tm.Success) {
   Add-Fact "dimension" "body" "height" (Get-FNum $tm.Groups[3].Value) "mm" $tm.Value.Trim()
 }
 
-$wl = [regex]::Match($low, 'duvar(?:lar)?[i\u0131]?(?:\s*kal[i\u0131]nl[i\u0131][g\u011f][i\u0131])?\s*(\d+(?:[.,]\d+)?)')
-if ($wl.Success) { Add-Fact "feature" "body.hollow" "wall_mm" (Get-FNum $wl.Groups[1].Value) "mm" $wl.Value.Trim() }
-$bt = [regex]::Match($low, 'taban\w*\s*kal[i\u0131]nl[i\u0131][g\u011f][i\u0131]?\s*(\d+(?:[.,]\d+)?)')
-if ($bt.Success) { Add-Fact "feature" "body.hollow" "bottom_thickness_mm" (Get-FNum $bt.Groups[1].Value) "mm" $bt.Value.Trim() }
+$wlM = Find-Measure $low 'duvar(?:lar)?[i\u0131]?' 60 $mpClaimedF
+if ($null -ne $wlM) { Add-Fact "feature" "body.hollow" "wall_mm" ([double]$wlM.value) "mm" ([string]$wlM.raw) }
+$btM = Find-Measure $low 'taban(?:[i\u0131]|n[i\u0131]|y[i\u0131]|[ae])?' 60 $mpClaimedF
+if ($null -ne $btM) { Add-Fact "feature" "body.hollow" "bottom_thickness_mm" ([double]$btM.value) "mm" ([string]$btM.raw) }
 if ($low -match "[u\u00fc]st[u\u00fc]\s*a[c\u00e7][i\u0131]k|[u\u00fc]stten\s*a[c\u00e7][i\u0131]k|[u\u00fc]st\s*k[i\u0131]sm[i\u0131]\s*a[c\u00e7][i\u0131]k|kapaks[i\u0131]z") {
   Add-Fact "feature" "body.hollow" "open_top" $true "" $Matches[0].Trim()
 }
@@ -105,7 +109,7 @@ if ($null -ne $pmBest) {
   Add-Fact "feature" "body.c1" "length_mm" (Get-FNum $pmBest.Groups[2].Value) "mm" $pmBest.Value.Trim()
 }
 if ($low -match "ortas[i\u0131]nda|ortada|merkezinde") { Add-Fact "relation" "body.c1" "horizontal" "center" "" $Matches[0].Trim() }
-$by = [regex]::Match($low, '(?:alttan|alt\s*kenar(?:dan|[i\u0131]\w*)\s*(?:tabandan\s*)?)(\d+(?:[.,]\d+)?)')
+$by = [regex]::Match($low, '(?:alttan\s*|tabandan\s*|alt\s*kenar(?:dan|[i\u0131]\w*)\s*(?:tabandan\s*)?)(\d+(?:[.,]\d+)?)')
 if ($by.Success) { Add-Fact "relation" "body.c1" "bottom_offset_mm" (Get-FNum $by.Groups[1].Value) "mm" $by.Value.Trim() }
 
 $dv = [regex]::Match($low, '(\d+)\s*adet\s*(?:ayr[i\u0131]\s*)?b[o\u00f6]lme')
@@ -126,19 +130,8 @@ else {
     if ($null -ne $bestDiv) { Add-Fact "feature" "dividers" "count" ([int]$bestDiv.Groups[1].Value) "adet" $bestDiv.Value.Trim() }
   }
 }
-$dth = [regex]::Match($low, 'b[o\u00f6]lme\w*\s*kal[i\u0131]nl[i\u0131][g\u011f][i\u0131]?\s*(\d+(?:[.,]\d+)?)')
-if ($dth.Success) { Add-Fact "feature" "dividers" "thickness_mm" (Get-FNum $dth.Groups[1].Value) "mm" $dth.Value.Trim() }
-else {
-  # Ters sira: "2 mm kalinliginda ... bolme" (parser :625-635 ile ayni kural, 70 karakter penceresi).
-  $bestTh = $null
-  foreach ($tm in [regex]::Matches($low, '(\d+(?:[.,]\d+)?)\s*mm\s*kal[i\u0131]nl[i\u0131][g\u011f][i\u0131]\w*')) {
-    foreach ($bm in [regex]::Matches($low, 'b[o\u00f6]lme')) {
-      $ddd = $tm.Index - $bm.Index
-      if ($ddd -lt 0 -and (-$ddd) -le 70) { $bestTh = $tm }
-    }
-  }
-  if ($null -ne $bestTh) { Add-Fact "feature" "dividers" "thickness_mm" (Get-FNum $bestTh.Groups[1].Value) "mm" $bestTh.Value.Trim() }
-}
+$dthM = Find-Measure $low 'kal[i\u0131]nl[i\u0131][kg\u011f][i\u0131]?\w*' 60 $mpClaimedF 'b[o\u00f6]lme' 70
+if ($null -ne $dthM) { Add-Fact "feature" "dividers" "thickness_mm" ([double]$dthM.value) "mm" ([string]$dthM.raw) }
 # Bolme ust-boslugu: bolme baglamindaki "ust kenardan 5 mm" (parser :644-656 ile ayni kural).
 foreach ($gm in [regex]::Matches($low, '[u\u00fc]st\s*kenardan\s*(\d+(?:[.,]\d+)?)')) {
   foreach ($bm in [regex]::Matches($low, 'b[o\u00f6]lme')) {
