@@ -1,0 +1,153 @@
+{
+  "registry_version": "1.0",
+  "external_root_hint": "3D-AI-External (repo root sibling; override via THREE_D_AI_EXTERNAL)",
+  "engines": [
+    {
+      "id": "trimesh", "category": "mesh",
+      "license": "MIT", "license_status": "PERMISSIVE",
+      "integration": "CORE_CANDIDATE", "status": "READY",
+      "adapter": "adapters/TrimeshAdapter.ps1",
+      "capabilities": ["Analyze", "Measure"],
+      "requirements": { "python": "3D-AI-External/envs/python312", "packages": ["numpy", "trimesh"] },
+      "notes": "Isolated env, numpy-only hard dep."
+    },
+    {
+      "id": "orcaslicer", "category": "slicer",
+      "license": "AGPL-3.0 (external binary, not linked)",
+      "license_status": "AGPL_FAMILY",
+      "integration": "CONDITIONAL_CANDIDATE", "status": "READY",
+      "adapter": "adapters/OrcaSlicerAdapter.ps1",
+      "capabilities": ["Detect", "Slice"],
+      "requirements": { "binary": "OrcaSlicer via resolver", "profiles": "real printer+filament+process required" },
+      "notes": "External binary only; slice without profiles is BLOCKED."
+    },
+    {
+      "id": "cadquery", "category": "cad",
+      "license": "Apache-2.0", "license_status": "PERMISSIVE",
+      "integration": "STRONG_CANDIDATE", "status": "MACHINE_LIMITED",
+      "adapter": "", "capabilities": [],
+      "requirements": { "python": "3.9-3.12 + pip/conda" },
+      "notes": "No Python toolchain on machine. Not installed."
+    },
+    {
+      "id": "build123d", "category": "cad",
+      "license": "Apache-2.0", "license_status": "PERMISSIVE",
+      "integration": "STRONG_CANDIDATE", "status": "MACHINE_LIMITED",
+      "adapter": "", "capabilities": [],
+      "requirements": { "python": "3.11-3.14 + pip" },
+      "notes": "No Python toolchain on machine. Not installed."
+    },
+    {
+      "id": "lib3mf", "category": "formats",
+      "license": "Simplified BSD", "license_status": "PERMISSIVE",
+      "integration": "CORE_CANDIDATE", "status": "MACHINE_LIMITED",
+      "adapter": "", "capabilities": [],
+      "requirements": { "toolchain": "CMake + VS or prebuilt binaries" },
+      "notes": "Source cloned; needs toolchain or prebuilt binary."
+    },
+    {
+      "id": "open3d", "category": "mesh",
+      "license": "MIT (mixed 3rdparty)", "license_status": "MIXED",
+      "integration": "STRONG_CANDIDATE", "status": "MACHINE_LIMITED",
+      "adapter": "", "capabilities": [],
+      "requirements": { "python": "3.10-3.14 + pip" },
+      "notes": "No Python toolchain on machine. Not installed."
+    },
+    {
+      "id": "pyvista", "category": "mesh",
+      "license": "MIT", "license_status": "PERMISSIVE",
+      "integration": "CONDITIONAL_CANDIDATE", "status": "MACHINE_LIMITED",
+      "adapter": "", "capabilities": [],
+      "requirements": { "python": "3.10+ + pip" },
+      "notes": "Preview candidate; headless use to be verified."
+    },
+    {
+      "id": "occt", "category": "cad",
+      "license": "LGPL-2.1 + exception", "license_status": "LGPL_FAMILY",
+      "integration": "CONDITIONAL_CANDIDATE", "status": "MACHINE_LIMITED",
+      "adapter": "", "capabilities": [],
+      "requirements": { "toolchain": "CMake + VS2019+" },
+      "notes": "Consume via OCP wheels, not direct build."
+    },
+    {
+      "id": "pymeshfix", "category": "mesh",
+      "license": "GPL-3.0", "license_status": "GPL_FAMILY",
+      "integration": "CONDITIONAL_CANDIDATE", "status": "LICENSE_REVIEW",
+      "adapter": "", "capabilities": [],
+      "requirements": { "decision": "GPL acceptability for closed product" },
+      "notes": "CRITICAL_LICENSE_RISK. External-tool use only if ever adopted."
+    },
+    {
+      "id": "prusa", "category": "slicers",
+      "license": "AGPL-3.0", "license_status": "AGPL_FAMILY",
+      "integration": "CONDITIONAL_CANDIDATE", "status": "LICENSE_REVIEW",
+      "adapter": "", "capabilities": [],
+      "requirements": { "decision": "external binary only" },
+      "notes": "CRITICAL_LICENSE_RISK. Never linked/bundled."
+    },
+    {
+      "id": "curaengine", "category": "slicers",
+      "license": "AGPL-3.0", "license_status": "AGPL_FAMILY",
+      "integration": "CONDITIONAL_CANDIDATE", "status": "LICENSE_REVIEW",
+      "adapter": "", "capabilities": [],
+      "requirements": { "decision": "external binary only", "toolchain": "C++20 + Conan + CMake" },
+      "notes": "CRITICAL_LICENSE_RISK. Never linked/bundled."
+    },
+    {
+      "id": "blender", "category": "visualization",
+      "license": "GPL", "license_status": "GPL_FAMILY",
+      "integration": "CONDITIONAL_CANDIDATE", "status": "MACHINE_LIMITED",
+      "adapter": "", "capabilities": [],
+      "requirements": { "binary": "downloadable release" },
+      "notes": "Headless use to be verified before automation."
+    },
+    {
+      "id": "meshlab", "category": "visualization",
+      "license": "GPL-3.0", "license_status": "GPL_FAMILY",
+      "integration": "CONDITIONAL_CANDIDATE", "status": "MACHINE_LIMITED",
+      "adapter": "", "capabilities": [],
+      "requirements": { "binary": "downloadable release" },
+      "notes": "Headless/scripted use to be verified before automation."
+    },
+    {
+      "id": "trellis", "category": "ai-reconstruction",
+      "license": "MIT (code)", "license_status": "PERMISSIVE",
+      "integration": "RESEARCH_ONLY", "status": "MACHINE_LIMITED",
+      "adapter": "", "capabilities": [],
+      "requirements": { "gpu": "NVIDIA + CUDA", "weights": "not downloaded" },
+      "notes": "No NVIDIA/CUDA on machine. Weights license unverified."
+    },
+    {
+      "id": "triposr", "category": "ai-reconstruction",
+      "license": "MIT", "license_status": "PERMISSIVE",
+      "integration": "CONDITIONAL_CANDIDATE", "status": "MACHINE_LIMITED",
+      "adapter": "", "capabilities": [],
+      "requirements": { "python": "3.8+ + pip", "gpu": "optional" },
+      "notes": "No Python toolchain on machine. Weights not downloaded."
+    },
+    {
+      "id": "hunyuan", "category": "ai-reconstruction",
+      "license": "Tencent Community (territory-limited)", "license_status": "CUSTOM",
+      "integration": "RESEARCH_ONLY", "status": "MACHINE_LIMITED",
+      "adapter": "", "capabilities": [],
+      "requirements": { "gpu": "NVIDIA 6/16GB VRAM", "weights": "not downloaded" },
+      "notes": "CRITICAL_LICENSE_RISK. No NVIDIA/CUDA on machine."
+    },
+    {
+      "id": "vtk", "category": "mesh",
+      "license": "BSD-style", "license_status": "PERMISSIVE",
+      "integration": "RESEARCH_ONLY", "status": "MACHINE_LIMITED",
+      "adapter": "", "capabilities": [],
+      "requirements": { "toolchain": "CMake + VS2019+" },
+      "notes": "Prefer PyVista wrapper over direct use."
+    },
+    {
+      "id": "text-to-cad", "category": "cad",
+      "license": "Proprietary", "license_status": "PROPRIETARY",
+      "integration": "NOT_INTEGRATED", "status": "LICENSE_REVIEW",
+      "adapter": "", "capabilities": [],
+      "requirements": {},
+      "notes": "CRITICAL_LICENSE_RISK. Never a dependency. Ideas only."
+    }
+  ]
+}
