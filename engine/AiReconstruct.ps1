@@ -7,6 +7,8 @@
   Olcek yoksa UNKNOWN (mm varsayimi YASAK). Guven bilimsel yuzde degildir.
 #>
 
+try { Add-Type -AssemblyName System.Drawing -ErrorAction Stop } catch { }
+
 function Test-ReconImageSet($files) {
   $errors = New-Object System.Collections.Generic.List[string]
   $infos = New-Object System.Collections.Generic.List[object]
