@@ -62,8 +62,8 @@ if ($Prompt.Trim() -eq "" -and $RefSpecFile -eq "") {
 }
 
 function Write-PResult($obj, $code) {
-  $obj | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $ProjectDir "pipeline-result.json") -Encoding UTF8
-  $obj | ConvertTo-Json -Depth 6
+  $obj | ConvertTo-Json -Depth 9 | Set-Content -LiteralPath (Join-Path $ProjectDir "pipeline-result.json") -Encoding UTF8
+  $obj | ConvertTo-Json -Depth 9
   exit $code
 }
 
@@ -351,10 +351,32 @@ if ($engCode -ne 0 -and $worst -eq "PASS") { $finalStatus = "FAILED" }
 if ($finalStatus -eq "FAILED" -and $parts.Count -eq 0) { $finalStatus = "BLOCKED" }
 
 Write-Trace "done" ([pscustomobject]@{ status = $finalStatus; parts = @($parts.ToArray() | ForEach-Object { $_.id }) })
+. (Join-Path $EngineDir "Test-SliceReadiness.ps1")
+$sliceModel = ""
+foreach ($cand in @(
+  (Join-Path $ProjectDir "model.stl"),
+  (Join-Path $ProjectDir (Join-Path "output" "model.stl"))
+)) { if (Test-Path -LiteralPath $cand) { $sliceModel = $cand; break } }
+if ($sliceModel -eq "") {
+  $outDir = Join-Path $ProjectDir "output"
+  if (Test-Path -LiteralPath $outDir) {
+    $firstMesh = Get-ChildItem -LiteralPath $outDir -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.Extension -eq ".stl" -or $_.Extension -eq ".3mf" } |
+      Select-Object -First 1
+    if ($firstMesh) { $sliceModel = $firstMesh.FullName }
+  }
+}
+$sliceReady = $null
+try {
+  $sliceReady = Test-SliceReadiness -ModelStl $sliceModel `
+    -PrinterJson (Join-Path $Root (Join-Path "printers" "generic-fdm.json")) `
+    -FilamentJson "" -ProcessJson "" -OrcaExe ""
+} catch { $sliceReady = [pscustomobject]@{ status = "BLOCKED"; missing = @(); slicer_exe = "" } }
 Write-PResult ([pscustomobject]@{
   status = $finalStatus; stage = "done"; provider = $providerName
   reason = $(if ($finalStatus -eq "PASS" -or $finalStatus -eq "WARNING") { "proje tamamlandi" } else { "uretim basarisiz; detay validation dosyalari" })
   questions = @(); parts = @($parts.ToArray()); gcode_available = $false
   stale_artifacts = @($staleList.ToArray())
   gcode_note = "NOT AVAILABLE - printer profile required"
+  slice_readiness = $sliceReady
 }) $(if ($finalStatus -eq "PASS" -or $finalStatus -eq "WARNING") { 0 } else { 2 })

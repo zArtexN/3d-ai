@@ -1,0 +1,19 @@
+{
+  "id": "_template",
+  "label": null,
+  "layer_height_mm": null,
+  "first_layer_height_mm": null,
+  "wall_loops": null,
+  "top_shell_layers": null,
+  "bottom_shell_layers": null,
+  "infill_pct": null,
+  "infill_pattern": null,
+  "support_enabled": null,
+  "support_type": null,
+  "print_speed_mm_s": null,
+  "travel_speed_mm_s": null,
+  "orca_profile": "REPLACE_WITH_ORCA_PROCESS_PROFILE_NAME",
+  "notes": "SABLON. Gercek process degerleri kullanicidan/Orca profilinden alinmadan dilimleme YAPILMAZ. Deger UYDURULMAZ.",
+  "source": "template",
+  "created_at": null
+}

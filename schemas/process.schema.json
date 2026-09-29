@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "3D AI Designer V2.0 - Process Profili",
+  "description": "processes/<process-id>.json dosyalari bu semaya uyar. Process yazici ve filamentten AYRIDIR. Degerler SADECE kullanici/Orca profilinden alinir; uydurma YASAK. Bilinmeyen alan null birakilir.",
+  "type": "object",
+  "required": ["id", "source"],
+  "properties": {
+    "id": { "type": "string", "description": "Benzersiz process ID (ornek: 0.2mm-pla-standard)" },
+    "label": { "type": ["string", "null"] },
+    "layer_height_mm": { "type": ["number", "null"], "exclusiveMinimum": 0, "description": "Katman yuksekligi. null = UNKNOWN. UYDURMA!" },
+    "first_layer_height_mm": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "wall_loops": { "type": ["integer", "null"], "minimum": 1 },
+    "top_shell_layers": { "type": ["integer", "null"], "minimum": 0 },
+    "bottom_shell_layers": { "type": ["integer", "null"], "minimum": 0 },
+    "infill_pct": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+    "infill_pattern": { "type": ["string", "null"] },
+    "support_enabled": { "type": ["boolean", "null"], "description": "Destek acik mi? null = UNKNOWN." },
+    "support_type": { "type": ["string", "null"], "enum": ["normal", "tree", "none", null] },
+    "print_speed_mm_s": { "type": ["number", "null"], "exclusiveMinimum": 0, "description": "Baski hizi. null = UNKNOWN. UYDURMA!" },
+    "travel_speed_mm_s": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "orca_profile": { "type": ["string", "null"], "description": "OrcaSlicer process profil adi. null/REPLACE_WITH_* = henuz eslestirilmedi." },
+    "notes": { "type": ["string", "null"] },
+    "source": { "type": "string", "description": "'user_input', 'orca:PROFIL_ADI', 'template' veya 'test_fixture'. Bos birakilamaz." },
+    "created_at": { "type": ["string", "null"] }
+  }
+}
