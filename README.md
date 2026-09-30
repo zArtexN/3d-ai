@@ -1,8 +1,17 @@
-# 3D AI Designer V2.1 — AI Destekli 3D Printing Engineering Workstation
+# 3D AI Designer V3.0 — AI Destekli 3D Printing Engineering Workstation
 
-Dogal dil / referans model -> olculere sadik parametrik model -> STL/3MF -> dogrulama -> printability/orientation/maliyet analizi -> README.
+Dogal dil / foto / model -> olculere sadik parametrik model -> STL/3MF -> dogrulama ->
+printability/orientation -> profil varsa dilimleme -> rapor.
 Slicing ayri asama; G-code SADECE gercek printer+filament+process profiliyle (su an kapali, BLOCKED).
-V2.1: dark industrial UI + ikon, parser hardening (kosegen delik yerlesimi, cap oneekleri, kapaksiz/bolme ayirimi), EXE build kilit korumasi.
+V3.0: Workstation UI + otonom orkestrator (text/image/mesh/STEP/project), PRINT_READY kapisi,
+registry'ler (printer/filament/process), export/arsiv, guvenlik + tasinabilirlik kilitleri.
+
+## Calistirma (V3)
+- Workstation: `powershell -File app\Workstation.ps1` (dashboard, pipeline, 3D onizleme, motorlar, ayarlar, loglar)
+- Orkestrator CLI: `powershell -File engine\Invoke-Orchestrator.ps1 -Source "..." -ProjectName demo`
+- Dry-run: ayni komut + `-DryRun` (calistirmaz, plan/eksik/artefakt raporu)
+- Export: `powershell -File scripts\Export-Project.ps1 -ProjectDir projects\demo -OutDir out`
+- Klasik UI: `powershell -File app\DesignerV1.ps1` (korunur)
 
 ## Bu program ne yapar / ne yapmaz
 YAPAR: dogal dildeki tasarimi olculere sadik DesignSpec'e cevirir, sorulmasi gerekeni sorar, CAD/STL uretir, mesh/printability/orientation/maliyet analizi yapar, OrcaSlicer entegrasyonunu gercek profil varsa kullanir.

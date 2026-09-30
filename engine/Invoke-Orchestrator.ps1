@@ -35,6 +35,9 @@ $OrchEngineDir = $PSScriptRoot
 $OrchRoot = Split-Path -Parent $OrchEngineDir
 . (Join-Path $OrchEngineDir (Join-Path "Engines" "EngineRegistry.ps1"))
 . (Join-Path $OrchEngineDir "Test-PrintReady.ps1")
+. (Join-Path $OrchEngineDir "Write-OpLog.ps1")
+. (Join-Path $OrchEngineDir "Get-CacheKey.ps1")
+. (Join-Path $OrchEngineDir "Test-PathSafe.ps1")
 . (Join-Path $OrchEngineDir "Test-SliceReadiness.ps1")
 . (Join-Path $OrchEngineDir "New-PrintJob.ps1")
 
@@ -392,6 +395,21 @@ function Get-TrimeshAdapter {
 function Invoke-Stage-mesh_qa {
   $rec = New-StageRecord "mesh_qa" "mesh-analyzer" $OrchVersion @("mesh-source")
   $rec.input = $script:ctx.MeshPath
+  $cacheFile = Join-Path $script:ctx.ProjectDir (Join-Path ".cache" "meshqa.json")
+  $ckey = Get-CacheKey ([string]$script:ctx.MeshPath) "mesh-analyzer" $OrchVersion "" ""
+  try {
+    if (Test-Path -LiteralPath $cacheFile) {
+      $cc = Get-Content -LiteralPath $cacheFile -Raw | ConvertFrom-Json
+      if ([string]$cc.key -eq $ckey -and $null -ne $cc.result) {
+        $r = $cc.result
+        $script:ctx.MeshQuality = [pscustomobject]@{ watertight = [bool]$r.watertight; faces = [int]$r.faces }
+        $script:ctx.MeasuredDims = @($r.dims)
+        $rec.output = ("watertight=" + [string]$r.watertight + " faces=" + [string]$r.faces + " (cache)")
+        if ([bool]$r.watertight -ne $true) { $rec.warnings += @("mesh watertight degil -> repair asamasina gidiyor") }
+        return (Close-Stage $rec "OK")
+      }
+    }
+  } catch { }
   $r = Get-MeshDims ([string]$script:ctx.MeshPath)
   if (-not [bool]$r.ok) {
     Add-StageError $rec "mesh-analyzer" ([string]$r.reason) ([string]$script:ctx.MeshPath) "mesh dosyasinin gecerli STL/3MF/OBJ oldugunu dogrulayin"
@@ -399,6 +417,11 @@ function Invoke-Stage-mesh_qa {
   }
   $script:ctx.MeshQuality = [pscustomobject]@{ watertight = [bool]$r.watertight; faces = [int]$r.faces }
   $script:ctx.MeasuredDims = @($r.dims)
+  try {
+    $cd = Split-Path -Parent $cacheFile
+    New-Item -ItemType Directory -Force -Path $cd | Out-Null
+    [pscustomobject]@{ key = $ckey; result = $r } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $cacheFile -Encoding UTF8
+  } catch { }
   $rec.output = ("watertight=" + [string]$r.watertight + " faces=" + [string]$r.faces)
   if ([bool]$r.watertight -ne $true) { $rec.warnings += @("mesh watertight degil -> repair asamasina gidiyor") }
   return (Close-Stage $rec "OK")
@@ -729,6 +752,14 @@ if ([string]$ProjectName -eq "" -and [string]$ProjectDir -eq "") {
   exit 2
 }
 $pdir = $ProjectDir
+if ($pdir -eq "" -and [string]$ProjectName -ne "") {
+  $projRoot = Join-Path $OrchRoot "projects"
+  $ps = Test-PathSafe $projRoot ([string]$ProjectName)
+  if (-not [bool]$ps.ok) {
+    Write-Output '{"status":"FAILED","reason":"proje adi kok disina cikiyor (path traversal engellendi)"}'
+    exit 2
+  }
+}
 if ($pdir -eq "" -and $detKind -eq "project" -and (Test-Path -LiteralPath ([string]$Source))) {
   $pdir = [string]$Source
 }
@@ -782,12 +813,15 @@ foreach ($sid in @($plan)) {
   }
   $fn = "Invoke-Stage-" + $sid
   $script:ctx.Stages = @($stages.ToArray())
+  $sw = [System.Diagnostics.Stopwatch]::StartNew()
   try { $rec = & $fn }
   catch {
     $rec = New-StageRecord $sid (Get-StageEngine $sid $null) $OrchVersion @()
     Add-StageError $rec "orchestrator" ("asama calismadi: " + $_.Exception.Message) $null "loglari inceleyin"
     $rec = Close-Stage $rec "FAILED"
   }
+  $sw.Stop()
+  try { Write-OpLog $pdir $sid ([string]$rec.engine) $sid $sw.ElapsedMilliseconds ([string]$rec.status) $(if (@($rec.errors).Count -gt 0) { [string]$rec.errors[0].reason } else { "" }) } catch { }
   $stages.Add($rec) | Out-Null
   if ($sid -eq "design" -or $sid -eq "reconstruct" -or $sid -eq "repair" -or $sid -eq "slice") {
     if (@("OK", "SKIPPED") -contains $rec.status) { Write-Checkpoint $ckptDir $rec }

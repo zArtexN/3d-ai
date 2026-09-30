@@ -16,6 +16,12 @@ vendor/
 projects/*/logs/
 projects/*/output/
 projects/*/validation/
+projects/*/.cache/
+projects/*/checkpoints/
+projects/*/jobs/
+projects/*/export/
+projects/*/candidates/
+*.jsonl
 
 # External engine workspace (sibling dir, research clones + isolated envs).
 # Never commit vendor clones or env binaries into the main repository.

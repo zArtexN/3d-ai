@@ -205,7 +205,7 @@ $vf = Join-Path $Root "VERSION"
 Assert-Test "version-file-exists" (Test-Path -LiteralPath $vf)
 if (Test-Path -LiteralPath $vf) {
   $ver = (Get-Content -LiteralPath $vf -Raw).Trim()
-  Assert-Test "version-is-v2" ($ver -match "V2")
+  Assert-Test "version-is-semver" ($ver -match "^\d+\.\d+\.\d+$")
 }
 
 # === SUMMARY ===

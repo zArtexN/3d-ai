@@ -64,3 +64,10 @@ Project (project.json + README parca listesi; slice YOK, G-code YOK)
 - YENI (V1.1): `[pscustomobject]@{...}` cast icine `List<T>` konmaz; once `.ToArray()`.
 - YENI (V1.1): dairesel yuzeylerde `$fn = 96` sart (faset bbox kaymasin).
 - WARNING asla FAIL yapmaz; kullanici degeri asla otomatik degismez.
+
+## V3.0 katmani (orkestrator + workstation)
+
+- engine/Invoke-Orchestrator.ps1: giris turu (text/image/stl/obj/3mf/step/project) -> plan -> asama kayitlari -> checkpoint (.json, atomik tmp+rename) -> resume/retry -> dry-run -> PRINT_READY kapisi (engine/Test-PrintReady.ps1).
+- Alt-sistemler: Test-Profiles/Test-SliceReadiness/New-PrintJob (P8), Analyze-Printability (P7), Invoke-Reconstruction (P6, mock test-disi), engine registry+adapterler (P5).
+- app/Workstation.ps1: yalnizca cagirir (dashboard/pipeline/viewer/diagnostics/settings/logs); uzun isler Start-Job + Timer ile. Gonderme kodu YOK.
+- Guvenlik: Test-PathSafe (traversal), string-komut yok, secret yok, AI ciktisi parse->validate zinciri. Log: ops.jsonl. Cache: Get-CacheKey (girdi-hash+motor+config+spec).

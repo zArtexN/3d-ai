@@ -35,7 +35,7 @@ function Count-Results($lines) {
 
 Write-Output "=== 1/11 SYNTAX ==="
 $synBad = 0; $synOk = 0
-$files = Get-ChildItem $Root -Include "*.ps1" -Recurse | Where-Object { ($_.FullName -notmatch "node_modules") -and ($_.FullName -notmatch "\\dist\\") }
+$files = Get-ChildItem $Root -Include "*.ps1" -Recurse | Where-Object { ($_.FullName -notmatch "node_modules") -and ($_.FullName -notmatch "\\dist\\") -and ($_.FullName -notmatch "dist_trash_") }
 foreach ($f in $files) {
   $errs = $null
   [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$errs)
@@ -124,10 +124,62 @@ $totalPass += $c.pass; $totalFail += $c.fail
 if ($c.fail -gt 0) { $suitesOk = $false }
 Write-Output "print: $($c.pass) PASS, $($c.fail) FAIL"
 
-Write-Output "=== 13/13 UI V2 STARTUP ==="
+Write-Output "=== 13/19 UI V2 STARTUP ==="
 $ui2 = & (Join-Path $Root (Join-Path "app" "DesignerV1.ps1")) -ValidateUI 2>&1 | Out-String
 if ($ui2 -match "UI-STARTUP: PASS") { $totalPass++; Write-Output "UI V2 startup: PASS" }
 else { $totalFail++; $suitesOk = $false; Write-Output "UI V2 startup: FAIL" }
+
+Write-Output "=== 14/19 SECURITY ==="
+$sec = & (Join-Path $scriptsDir "Test-Security.ps1") 2>&1
+$c = Count-Results $sec
+$totalPass += $c.pass; $totalFail += $c.fail
+if ($c.fail -gt 0) { $suitesOk = $false }
+Write-Output "security: $($c.pass) PASS, $($c.fail) FAIL"
+
+Write-Output "=== 15/19 PORTABILITY ==="
+$por = & (Join-Path $scriptsDir "Test-Portability.ps1") 2>&1
+$c = Count-Results $por
+$totalPass += $c.pass; $totalFail += $c.fail
+if ($c.fail -gt 0) { $suitesOk = $false }
+Write-Output "portability: $($c.pass) PASS, $($c.fail) FAIL"
+
+Write-Output "=== 16/19 CLEANMACHINE ==="
+$cm = & (Join-Path $scriptsDir "Test-CleanMachine.ps1") 2>&1
+$c = Count-Results $cm
+$totalPass += $c.pass; $totalFail += $c.fail
+if ($c.fail -gt 0) { $suitesOk = $false }
+Write-Output "cleanmachine: $($c.pass) PASS, $($c.fail) FAIL"
+
+Write-Output "=== 17/19 WORKSTATION UI ==="
+$ws = & (Join-Path $scriptsDir "Test-Workstation.ps1") 2>&1
+$c = Count-Results $ws
+$totalPass += $c.pass; $totalFail += $c.fail
+if ($c.fail -gt 0) { $suitesOk = $false }
+Write-Output "workstation: $($c.pass) PASS, $($c.fail) FAIL"
+
+Write-Output "=== 18/19 EXPORT ==="
+$ex = & (Join-Path $scriptsDir "Test-Export.ps1") 2>&1
+$c = Count-Results $ex
+$totalPass += $c.pass; $totalFail += $c.fail
+if ($c.fail -gt 0) { $suitesOk = $false }
+Write-Output "export: $($c.pass) PASS, $($c.fail) FAIL"
+
+Write-Output "=== 19/19 PHASE SUITES (slice/printability/orchestrator) ==="
+$ph1 = & (Join-Path $scriptsDir "Test-SliceJob.ps1") 2>&1
+$c = Count-Results $ph1
+$totalPass += $c.pass; $totalFail += $c.fail
+if ($c.fail -gt 0) { $suitesOk = $false }
+Write-Output "slice-job: $($c.pass) PASS, $($c.fail) FAIL"
+$ph2 = & (Join-Path $scriptsDir "Test-PrintabilityPro.ps1") 2>&1
+$c = Count-Results $ph2
+$totalPass += $c.pass; $totalFail += $c.fail
+if ($c.fail -gt 0) { $suitesOk = $false }
+Write-Output "printability-pro: $($c.pass) PASS, $($c.fail) FAIL"
+$ph3 = & (Join-Path $scriptsDir "Test-Orchestrator.ps1") 2>&1
+$c = Count-Results $ph3
+$totalPass += $c.pass; $totalFail += $c.fail
+if ($c.fail -gt 0) { $suitesOk = $false }
+Write-Output "orchestrator: $($c.pass) PASS, $($c.fail) FAIL"
 
 $total = ($totalPass + $totalFail)
 Write-Output "========================================"

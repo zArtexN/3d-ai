@@ -1,5 +1,17 @@
 # CHANGELOG — 3D AI Designer
 
+## V3.0.0 (final release)
+- Orkestrator (Phase 9): text/image/STL/OBJ/3MF/STEP/project yonlendirme, asama izleme,
+  checkpoint+resume+retry, fallback kaydi, dry-run, PRINT_READY kapisi (16/16 test).
+- Slicer+printer (Phase 8): process registry, profil dogrulama, slice-readiness gate,
+  print-job yapisi, offline mod (10/10 test).
+- Printability pro (Phase 7): bilesen-bazli duvar, delik detayi, overhang siddeti,
+  onarim politikasi fill_holes+fix_normals (10/10 test).
+- Workstation (Phase 10): tek masaustu yuzeyi (dashboard, pipeline, wireframe viewer,
+  engine diagnostics, settings, logs), Export-Project, guvenlik/tasinabilirlik/temiz-makine
+  testleri, yapisal ops.jsonl logu, cache anahtari, path traversal korumasi.
+- Duvar/malzeme bilinmiyorsa NEEDS_INPUT; profil yoksa G-code BLOCKED (degismedi).
+
 ## UNRELEASED (adim-holefix)
 - Negative intent: lid/hole/slot/fillet/chamfer acik reddi uretilmez; disabled_features spec kokunde korunur.
 - Ciplak "kenardan" tek basina delik kaniti sayilmaz.

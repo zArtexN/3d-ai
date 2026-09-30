@@ -79,3 +79,10 @@ SORU/CEVAP GECMISI panelinde saklanir.
 - Duvar cok inceyse program UYARI verir ama senin olcunu degistirmez.
 - EXE acikken yeniden build calistirma: once uygulamayi kapat (build kilitliyse BLOCKED yazar).
 - Yazici/filament eklemeden sicaklik/hiz/nozzle degeri gostermez; UNKNOWN yazar.
+
+## V3.0: Workstation + orkestrator
+
+- Workstation ac: powershell -File app\Workstation.ps1. Proje yaz/sec, Import/Text/Photo ile baslat, Analyze ile hatti kos, Export ile cikti+arsiv al.
+- Komut satiri: powershell -File engine\Invoke-Orchestrator.ps1 -Source '50x50x20 kutu' -ProjectName demo (-DryRun, -Resume, -RetryStage).
+- Print (offline) yalnizca hazirlik kaydi acar; yaziciya GONDERMEZ.
+- 3D onizleme: wireframe; surukle=dondur, sag-surukle=tasi, tekerlek=zoom, cift-tik=sifirla. Olculer bbox+ucgen sayisi olarak yazilir.
