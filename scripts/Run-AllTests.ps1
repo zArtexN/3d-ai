@@ -181,6 +181,32 @@ $totalPass += $c.pass; $totalFail += $c.fail
 if ($c.fail -gt 0) { $suitesOk = $false }
 Write-Output "orchestrator: $($c.pass) PASS, $($c.fail) FAIL"
 
+Write-Output "=== 20/20 PRODUCT DESIGN (planner/intent/edit) ==="
+$pd1 = & (Join-Path $scriptsDir "Test-DesignPlanner.ps1") 2>&1
+$c = Count-Results $pd1
+$totalPass += $c.pass; $totalFail += $c.fail
+if ($c.fail -gt 0) { $suitesOk = $false }
+Write-Output "design-planner: $($c.pass) PASS, $($c.fail) FAIL"
+$pd2 = & (Join-Path $scriptsDir "Test-ProductDesigns.ps1") 2>&1
+$c = Count-Results $pd2
+$totalPass += $c.pass; $totalFail += $c.fail
+if ($c.fail -gt 0) { $suitesOk = $false }
+Write-Output "product-designs: $($c.pass) PASS, $($c.fail) FAIL"
+
+Write-Output "=== 21/21 EXTERNAL OPEN ==="
+$xo = & (Join-Path $scriptsDir "Test-ExternalOpen.ps1") 2>&1
+$c = Count-Results $xo
+$totalPass += $c.pass; $totalFail += $c.fail
+if ($c.fail -gt 0) { $suitesOk = $false }
+Write-Output "external-open: $($c.pass) PASS, $($c.fail) FAIL"
+
+Write-Output "=== 22/22 VIEWER PERF ==="
+$vp = & (Join-Path $scriptsDir "Test-ViewerPerf.ps1") 2>&1
+$c = Count-Results $vp
+$totalPass += $c.pass; $totalFail += $c.fail
+if ($c.fail -gt 0) { $suitesOk = $false }
+Write-Output "viewer-perf: $($c.pass) PASS, $($c.fail) FAIL"
+
 $total = ($totalPass + $totalFail)
 Write-Output "========================================"
 Write-Output "TOTAL: $total | PASS: $totalPass | FAIL: $totalFail"

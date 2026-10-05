@@ -20,6 +20,8 @@ function Add-UResult($name, $ok, $detail) {
   Write-Output "[$label] $name -- $detail"
 }
 
+$initialLeft = @(Get-ChildItem -LiteralPath (Join-Path $Root "projects") -Directory | Where-Object { $_.Name -match "^proje-" } | Select-Object -ExpandProperty Name)
+
 try {
   $o = & $App -UITest 2>&1 | Out-String
   $ok = ($o -match "UI-TEST: PASS")
@@ -34,8 +36,9 @@ try {
 } catch { Add-UResult "UQA-02-ui-startup" $false $_.Exception.Message }
 
 try {
-  $left = @(Get-ChildItem -LiteralPath (Join-Path $Root "projects") -Directory | Where-Object { $_.Name -match "^proje-" })
-  Add-UResult "UQA-03-no-leftover" ($left.Count -eq 0) $(if ($left.Count -eq 0) { "artik proje yok" } else { "kalan: $(@($left | ForEach-Object { $_.Name }) -join ',')" })
+  $currentLeft = @(Get-ChildItem -LiteralPath (Join-Path $Root "projects") -Directory | Where-Object { $_.Name -match "^proje-" } | Select-Object -ExpandProperty Name)
+  $newLeft = @($currentLeft | Where-Object { $initialLeft -notcontains $_ })
+  Add-UResult "UQA-03-no-leftover" ($newLeft.Count -eq 0) $(if ($newLeft.Count -eq 0) { "artik proje yok" } else { "kalan: $(@($newLeft) -join ',')" })
 } catch { Add-UResult "UQA-03-no-leftover" $false $_.Exception.Message }
 
 $passed = @($results | Where-Object { $_.result -eq "PASS" }).Count

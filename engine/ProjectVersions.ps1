@@ -117,7 +117,10 @@ function Undo-ProjectVersion($projectDir) {
     if ($null -eq $parent -or [string]$parent -eq "") { return @{ ok = $false; message = "geri gidilecek surum yok"; current = $cur } }
     $idx.redo_stack = @(@($cur) + @($idx.redo_stack))
     $idx.current = [string]$parent
-    Write-VersionsIndex $projectDir $idx
+    Write-VersionsIndex $ProjectDir $idx
+    $restored = Get-VersionSpec $ProjectDir ([string]$parent)
+    if ($null -eq $restored) { throw "hedef surum okunamadi" }
+    $restored | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $ProjectDir "spec.json") -Encoding UTF8
     return @{ ok = $true; message = "ok"; current = [string]$parent }
   } finally { Release-VersionLock $projectDir }
 }
@@ -138,7 +141,10 @@ function Redo-ProjectVersion($projectDir) {
     for ($i = 1; $i -lt $stack.Count; $i++) { $rest += $stack[$i] }
     $idx.redo_stack = @($rest)
     $idx.current = $nxt
-    Write-VersionsIndex $projectDir $idx
+    Write-VersionsIndex $ProjectDir $idx
+    $restored = Get-VersionSpec $ProjectDir $nxt
+    if ($null -eq $restored) { throw "hedef surum okunamadi" }
+    $restored | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $ProjectDir "spec.json") -Encoding UTF8
     return @{ ok = $true; message = "ok"; current = $nxt }
   } finally { Release-VersionLock $projectDir }
 }

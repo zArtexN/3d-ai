@@ -248,8 +248,83 @@ if ($null -ne $diaVal -and -not ($negated -contains "hole")) {
     depth_mm = $null; cs_dia_mm = $null; cs_depth_mm = $null; cb_dia_mm = $null; cb_depth_mm = $null
     screw = $null; status = "missing"
   }
+  # Yuz algilama: "on yuzde/arka yuzde" delik baglaminda -\u003e axis="y", face="front"/"rear".
+  $holeFace = $null
+  $holeFaceCands = @()
+  foreach ($fm in [regex]::Matches($low, '(?<!\w)[o\u00f6]n\s*y[u\u00fc]z')) { $holeFaceCands += @{ f = "front"; i = $fm.Index } }
+  foreach ($fm in [regex]::Matches($low, '(?<!\w)arka\s*y[u\u00fc]z')) { $holeFaceCands += @{ f = "rear"; i = $fm.Index } }
+  foreach ($fm in [regex]::Matches($low, '(?<!\w)[o\u00f6]n\s*(?:taraf|kenar|panel|duvar|cephe)')) { $holeFaceCands += @{ f = "front"; i = $fm.Index } }
+  foreach ($fm in [regex]::Matches($low, '(?<!\w)arka\s*(?:taraf|kenar|panel|duvar|cephe)')) { $holeFaceCands += @{ f = "rear"; i = $fm.Index } }
+  $bestHoleFace = $null; $bestHoleFaceDist = 999999
+  $stemIdxFace = -1
+  $stemMFace = [regex]::Match($low, $holeStemRx)
+  if ($stemMFace.Success) { $stemIdxFace = $stemMFace.Index }
+  foreach ($fc in $holeFaceCands) {
+    $fdd = 999999
+    if ($stemIdxFace -ge 0) { $fdd = [Math]::Abs($fc.i - $stemIdxFace) }
+    if ($fdd -lt $bestHoleFaceDist -and $fdd -le 80) { $bestHoleFaceDist = $fdd; $bestHoleFace = $fc.f }
+  }
+  if ($null -ne $bestHoleFace) {
+    $holeFace = $bestHoleFace
+    $hole.axis = "y"
+    $hole | Add-Member -NotePropertyName "face" -NotePropertyValue $holeFace -Force
+  }
   if ($mc.Success) {
     $hole.center_x_mm = (Get-Num $mc.Groups[1].Value); $hole.center_y_mm = (Get-Num $mc.Groups[2].Value); $hole.status = "ok"
+  } elseif ($null -ne $holeFace) {
+    # Yuz-tabanli delik: "merkezde/ortasinda" + "tabandan N mm" cozumu.
+    $faceCentered = $false
+    foreach ($smx in [regex]::Matches($low, $holeStemRx)) {
+      foreach ($kmx in [regex]::Matches($low, 'merkezde|merkez(?:inde|ine)|ortada|ortas[i\u0131]nda|ortalanm[i\u0131u\u00fc][s\u015f]')) {
+        if ([Math]::Abs($smx.Index - $kmx.Index) -le 60) { $faceCentered = $true }
+      }
+    }
+    # "on yuzde merkezde" ifadesindeki merkezde kelimesini de kontrol et (delik kelimesinden uzak olsa bile).
+    if (-not $faceCentered) {
+      foreach ($fc in $holeFaceCands) {
+        foreach ($kmx in [regex]::Matches($low, 'merkezde|merkez(?:inde|ine)|ortada|ortas[i\u0131]nda|ortalanm[i\u0131u\u00fc][s\u015f]')) {
+          if ([Math]::Abs($fc.i - $kmx.Index) -le 40) { $faceCentered = $true }
+        }
+      }
+    }
+    # Dikey konum: "tabandan N mm" / "alttan N mm" (delik baglaminda, 80 karakter icinde).
+    $faceZ = $null
+    foreach ($zm in [regex]::Matches($low, '(?:tabandan|alttan|alt\s*kenardan)\s*(\d+(?:[.,]\d+)?)')) {
+      if ($stemIdxFace -ge 0 -and [Math]::Abs($zm.Index - $stemIdxFace) -le 80) { $faceZ = (Get-Num $zm.Groups[1].Value) }
+      # Yuz baglami yakin ise de kabul et.
+      foreach ($fc in $holeFaceCands) {
+        if ([Math]::Abs($zm.Index - $fc.i) -le 80) { $faceZ = (Get-Num $zm.Groups[1].Value) }
+      }
+    }
+    $bw3 = 0; $bd3 = 0; $bh3 = 0
+    if ($null -ne $comp.base.width_mm) { $bw3 = [double]$comp.base.width_mm }
+    if ($null -ne $comp.base.depth_mm) { $bd3 = [double]$comp.base.depth_mm }
+    if ($null -ne $comp.base.height_mm) { $bh3 = [double]$comp.base.height_mm }
+    $faceResolved = $false
+    if ($faceCentered -and $bw3 -gt 0) {
+      # On/arka yuzde merkezde: X = govde genisligi / 2.
+      $hole.center_x_mm = $bw3 / 2
+      if ($null -ne $faceZ) {
+        $hole.center_y_mm = $faceZ
+        $hole.status = "ok"
+        $faceResolved = $true
+      } elseif ($bh3 -gt 0) {
+        # Dikey konum belirtilmemis ama yukseklik var: yukseklik/2 (merkezde).
+        $hole.center_y_mm = $bh3 / 2
+        $hole.status = "ok"
+        $faceResolved = $true
+      }
+    }
+    if (-not $faceResolved -and $null -ne $faceZ -and $bw3 -gt 0) {
+      # Tabandan belirtilmis ama yatay merkezleme yok: yatayda merkezle (varsayilan).
+      $hole.center_x_mm = $bw3 / 2
+      $hole.center_y_mm = $faceZ
+      $hole.status = "ok"
+      $faceResolved = $true
+    }
+    if (-not $faceResolved) {
+      $questions.Add("Yuz deliginin konumu eksik (kritik olcu, uydurulamaz). Ornek: merkez 50,15 (X,Z referans koseden mm).")
+    }
   } else {
     $edgeDone = $false
     $edgeOffVal = $null

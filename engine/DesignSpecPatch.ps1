@@ -36,6 +36,15 @@ function Get-SpecPathValue($spec, $path) {
     }
     return @{ found = $false; value = $null }
   }
+  if ($rest.Count -eq 3 -and $rest[0] -in @("partitions", "wedges")) {
+    $arr = @($comp.($rest[0]))
+    foreach ($it in $arr) {
+      if ($it -and [string]$it.id -eq $rest[1]) {
+        return @{ found = ($null -ne $it.($rest[2])); value = $it.($rest[2]) }
+      }
+    }
+    return @{ found = $false; value = $null }
+  }
   if ($rest.Count -eq 2 -and $rest[0] -eq "edge_notes") {
     foreach ($en in @($comp.edge_notes)) {
       if ($en -and [string]$en.kind -eq $rest[1]) {
@@ -53,6 +62,9 @@ function Test-PatchPathAllowed($path, $op) {
     if ($p -match '^[a-z0-9_]+\.cutouts\.[a-z0-9_]+$') { return $true }
     if ($p -match '^[a-z0-9_]+\.holes\.[a-z0-9_]+$') { return $true }
     if ($p -match '^[a-z0-9_]+\.edge_notes\.(fillet|chamfer)$') { return $true }
+    if ($p -match '^[a-z0-9_]+\.divider_pattern$') { return $true }
+    if ($p -match '^[a-z0-9_]+\.partitions\.[a-z0-9_]+$') { return $true }
+    if ($p -match '^[a-z0-9_]+\.wedges\.[a-z0-9_]+$') { return $true }
     return $false
   }
   if ($op -eq "add") {
@@ -66,6 +78,8 @@ function Test-PatchPathAllowed($path, $op) {
   if ($p -match '^[a-z0-9_]+\.cutouts\.[a-z0-9_]+\.(width_mm|length_mm|pos_x_mm|pos_y_mm|depth_mm)$') { return $true }
   if ($p -match '^[a-z0-9_]+\.tolerance\.clearance_mm$') { return $true }
   if ($p -match '^[a-z0-9_]+\.divider_pattern\.(count|thickness_mm|top_gap_mm)$') { return $true }
+  if ($p -match '^[a-z0-9_]+\.partitions\.[a-z0-9_]+\.(x_mm|y_mm|z0_mm|thickness_mm|length_mm|height_mm)$') { return $true }
+  if ($p -match '^[a-z0-9_]+\.wedges\.[a-z0-9_]+\.(angle_deg|x0_mm|x1_mm|y0_mm|y1_mm|z0_mm|height_mm)$') { return $true }
   if ($p -match '^[a-z0-9_]+\.edge_notes\.(fillet|chamfer)$') { return $true }
   return $false
 }
@@ -102,6 +116,14 @@ function Test-PatchOp($spec, $op) {
   }
   if ($opName -eq "remove") {
     $cur = Get-SpecPathValue $spec $path
+    if ($segs.Count -eq 2 -and $segs[1] -eq "divider_pattern") {
+      $dpFound = $false
+      foreach ($cc in @($spec.components)) {
+        if ($cc -and [string]$cc.id -eq $segs[0] -and $null -ne $cc.divider_pattern) { $dpFound = $true }
+      }
+      if (-not $dpFound) { return @{ ok = $false; message = ("kaldirilacak hedef yok: " + $path) } }
+      return @{ ok = $true; message = "ok" }
+    }
     if (-not $cur.found) { return @{ ok = $false; message = ("kaldirilacak hedef yok: " + $path) } }
     return @{ ok = $true; message = "ok" }
   }
@@ -158,9 +180,11 @@ function Invoke-PatchOp($spec, $op) {
   }
   if ($null -eq $comp) { throw "component yok: $($segs[0])" }
   if ($opName -eq "remove") {
-    if ($segs[1] -eq "holes" -or $segs[1] -eq "cutouts") {
+    if ($segs[1] -eq "holes" -or $segs[1] -eq "cutouts" -or $segs[1] -eq "partitions" -or $segs[1] -eq "wedges") {
       $arr = @(@($comp.($segs[1])) | Where-Object { $_ -and [string]$_.id -ne $segs[2] })
       $comp.($segs[1]) = @($arr)
+    } elseif ($segs[1] -eq "divider_pattern") {
+      $comp.PSObject.Properties.Remove("divider_pattern")
     } elseif ($segs[1] -eq "edge_notes") {
       $arr = @(@($comp.edge_notes) | Where-Object { $_ -and [string]$_.kind -ne $segs[2] })
       $comp.edge_notes = @($arr)
@@ -188,7 +212,7 @@ function Invoke-PatchOp($spec, $op) {
     $target.($rest[1]) = $op.value
     return $copy
   }
-  if ($rest.Count -eq 3 -and $rest[0] -in @("holes", "cutouts")) {
+  if ($rest.Count -eq 3 -and $rest[0] -in @("holes", "cutouts", "partitions", "wedges")) {
     foreach ($it in @($comp.($rest[0]))) {
       if ($it -and [string]$it.id -eq $rest[1]) {
         if ($rest[2] -eq "center") {
@@ -241,6 +265,20 @@ function Compare-Spec($a, $b) {
         }
       }
     }
+    foreach ($t in @($c.partitions)) {
+      if ($t -and $t.id) {
+        foreach ($f in @("x_mm", "y_mm", "z0_mm", "thickness_mm", "length_mm", "height_mm")) {
+          $paths.Add(($cid + ".partitions." + [string]$t.id + "." + $f)) | Out-Null
+        }
+      }
+    }
+    foreach ($t in @($c.wedges)) {
+      if ($t -and $t.id) {
+        foreach ($f in @("angle_deg", "x0_mm", "x1_mm", "y0_mm", "y1_mm", "z0_mm", "height_mm")) {
+          $paths.Add(($cid + ".wedges." + [string]$t.id + "." + $f)) | Out-Null
+        }
+      }
+    }
     foreach ($en in @($c.edge_notes)) {
       if ($en -and $en.kind) { $paths.Add(($cid + ".edge_notes." + [string]$en.kind)) | Out-Null }
     }
@@ -268,7 +306,9 @@ function Get-CriticalPaths() {
     '*.divider_pattern.count', '*.divider_pattern.thickness_mm',
     '*.tolerance.clearance_mm',
     '*.cutouts.*.width_mm', '*.cutouts.*.length_mm', '*.cutouts.*.pos_x_mm',
-    '*.cutouts.*.pos_y_mm', '*.cutouts.*.depth_mm'
+    '*.cutouts.*.pos_y_mm', '*.cutouts.*.depth_mm',
+    '*.partitions.*.x_mm', '*.partitions.*.thickness_mm', '*.partitions.*.height_mm',
+    '*.wedges.*.angle_deg', '*.wedges.*.x0_mm', '*.wedges.*.height_mm'
   )
 }
 

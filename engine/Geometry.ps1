@@ -73,12 +73,19 @@ function New-GRoundedBox($w, $d, $h, $r) {
 }
 
 # ---- hole (§9): through / blind / countersink / counterbore / clearance ----
-function New-GHole($dia, $x, $y, $bodyH, $holeType, $extra) {
+# $axis: "z" (ust/alt yuzey, varsayilan), "y" (on/arka yuzey). "y" ise $x=X, $y=Z, $bodyH=derinlik(Y).
+function New-GHole($dia, $x, $y, $bodyH, $holeType, $extra, $axis) {
   Assert-Pos "diameter" $dia
   if ($null -eq $holeType -or $holeType -eq "") { $holeType = "through" }
+  if ($null -eq $axis -or $axis -eq "") { $axis = "z" }
   $r = [double]$dia / 2
   if ($holeType -eq "through" -or $holeType -eq "clearance") {
     $hh = Format-Num ([double]$bodyH + 2)
+    if ($axis -eq "y") {
+      # On/arka yuzey deligi: Y ekseninde silindir. $x=X konum, $y=Z konum, $bodyH=Y derinlik.
+      $s = "translate([" + (Format-Num $x) + ", -1, " + (Format-Num $y) + "]) rotate([-90, 0, 0]) cylinder(d = " + (Format-Num $dia) + ", h = " + $hh + ");"
+      return (New-GObj "hole" $s @(([double]$x - $r), 0, ([double]$y - $r)) @(([double]$x + $r), [double]$bodyH, ([double]$y + $r)) $null)
+    }
     $s = "translate([" + (Format-Num $x) + ", " + (Format-Num $y) + ", -1]) cylinder(d = " + (Format-Num $dia) + ", h = " + $hh + ");"
     return (New-GObj "hole" $s @(([double]$x - $r), ([double]$y - $r), 0) @(([double]$x + $r), ([double]$y + $r), [double]$bodyH) $null)
   } elseif ($holeType -eq "blind") {
@@ -158,6 +165,57 @@ function New-GHollowBox($w, $d, $h, $wall, $openTop, $floor) {
   $g = New-GObj "hollow_box" $s @(0, 0, 0) @([double]$w, [double]$d, [double]$h) $null
   $g | Add-Member -NotePropertyName "ok" $true
   return $g
+}
+
+# ---- rounded hollow box (v2.2, gercek radius): dis yuvarlak + ic keskin ----
+# 2021.01 uyumlu (minkowski+sphere; BOSL2 yok). r <= duvar olmali (duvar korunur).
+function New-GHollowRoundedBox($w, $d, $h, $wall, $r, $openTop, $floor) {
+  Assert-Pos "width" $w; Assert-Pos "depth" $d; Assert-Pos "height" $h
+  Assert-Pos "wall" $wall; Assert-Pos "radius" $r
+  $ww = [double]$wall; $rr = [double]$r
+  $fl = Get-HollowFloor $wall $floor
+  if (2 * $ww -ge [double]$w -or 2 * $ww -ge [double]$d -or $ww -ge [double]$h -or $fl -ge [double]$h) {
+    return [pscustomobject]@{ ok = $false; reason = "ici bos govde imkansiz: duvar/taban govdeye sigmiyor" }
+  }
+  if (2 * $rr -gt [math]::Min([double]$w, [math]::Min([double]$d, [double]$h))) {
+    return [pscustomobject]@{ ok = $false; reason = "radius cok buyuk: 2*r en kucuk olcuyu asiyor" }
+  }
+  if ($rr -gt $ww + 2.0) {
+    return [pscustomobject]@{ ok = $false; reason = "radius duvar kalinligini asiyor (r <= duvar+2); duvar korunamaz" }
+  }
+  $iw = Format-Num ([double]$w - 2 * $ww); $id2 = Format-Num ([double]$d - 2 * $ww)
+  $flS = Format-Num $fl
+  $ow = Format-Num ([double]$w - 2 * $rr); $od = Format-Num ([double]$d - 2 * $rr)
+  $oh = Format-Num ([double]$h - 2 * $rr)
+  $rrS = Format-Num $rr
+  $outer = "translate([" + $rrS + ", " + $rrS + ", " + $rrS + "]) minkowski() { cube([" + $ow + ", " + $od + ", " + $oh + "]); sphere(r = " + $rrS + "); }"
+  if ($openTop) { $ih = Format-Num ([double]$h - $fl + 1) }
+  else { $ih = Format-Num ([double]$h - $ww - $fl) }
+  $inner = "translate([" + (Format-Num $ww) + ", " + (Format-Num $ww) + ", " + $flS + "]) cube([" + $iw + ", " + $id2 + ", " + $ih + "]);"
+  $s = "difference() { " + $outer + " " + $inner + " }"
+  $g = New-GObj "hollow_rounded_box" $s @(0, 0, 0) @([double]$w, [double]$d, [double]$h) $null
+  $g | Add-Member -NotePropertyName "ok" $true
+  return $g
+}
+
+# ---- planner partitions/wedges (v1.0, additive): govde-ici elemanlar ----
+# Kama: X boyunca ekstruzyonlu dik-ucgen prizma (polyhedron, 2021.01 uyumlu).
+# Profil (Y-Z): A(y0,z0) on-alt -> B(y1,z0) arka-alt -> C(y1,z0+h) arka-ust.
+# Yaslanma yuzu A->C; dikeyden aci = atan((y1-y0)/h).
+function New-GWedge($x0, $x1, $y0, $y1, $z0, $h) {
+  if ($null -eq $x0 -or $null -eq $x1 -or [double]$x1 -le [double]$x0) { throw "geometry: wedge x1 > x0 olmali" }
+  if ($null -eq $y0 -or $null -eq $y1 -or [double]$y1 -le [double]$y0) { throw "geometry: wedge y1 > y0 olmali" }
+  Assert-Pos "wedge-height" $h
+  $pts = @(
+    ("[" + (Format-Num $x0) + ", " + (Format-Num $y0) + ", " + (Format-Num $z0) + "]"),
+    ("[" + (Format-Num $x1) + ", " + (Format-Num $y0) + ", " + (Format-Num $z0) + "]"),
+    ("[" + (Format-Num $x1) + ", " + (Format-Num $y1) + ", " + (Format-Num $z0) + "]"),
+    ("[" + (Format-Num $x0) + ", " + (Format-Num $y1) + ", " + (Format-Num $z0) + "]"),
+    ("[" + (Format-Num $x1) + ", " + (Format-Num $y1) + ", " + (Format-Num ([double]$z0 + [double]$h)) + "]"),
+    ("[" + (Format-Num $x0) + ", " + (Format-Num $y1) + ", " + (Format-Num ([double]$z0 + [double]$h)) + "]")
+  )
+  $s = "polyhedron(points=[" + ($pts -join ", ") + "], faces=[[0,2,1], [0,3,2], [2,3,5], [2,5,4], [0,1,4], [0,4,5], [0,5,3], [1,2,4]]);"
+  return (New-GObj "wedge" $s @([double]$x0, [double]$y0, [double]$z0) @([double]$x1, [double]$y1, ([double]$z0 + [double]$h)) $null)
 }
 
 # ---- fillet / chamfer (§10): guvenli olan uygulanir, riskli olan WARNING olur ----

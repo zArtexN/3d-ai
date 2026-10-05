@@ -22,6 +22,7 @@ $EngineDir = $PSScriptRoot
 . (Join-Path $EngineDir "EditIntent.ps1")
 . (Join-Path $EngineDir "ProjectVersions.ps1")
 . (Join-Path $EngineDir "CanonicalSpec.ps1")
+. (Join-Path $EngineDir "Write-OpLog.ps1")
 
 function Write-EditResult($obj, $code) {
   $obj | ConvertTo-Json -Depth 8
@@ -162,6 +163,7 @@ try {
   $nid = New-ProjectVersion $ProjectDir $currentId $candSpec ("edit: " + ($sumLines -join "; ")) $ops $null $measSummary
   $candSpec | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $specPath -Encoding UTF8
   Remove-Item -LiteralPath $candDir -Recurse -Force -ErrorAction SilentlyContinue
+  Write-OpLog $ProjectDir "edit" "Invoke-SpecEdit" $Instruction 0 "OK" ""
   Write-EditResult ([pscustomobject]@{
     status = "OK"; reason = "accepted"; version = $nid
     diff_changed = @($diff.changed); diff_report = @($critLines)
@@ -169,6 +171,7 @@ try {
   }) 0
 } catch {
   Remove-Item -LiteralPath $candDir -Recurse -Force -ErrorAction SilentlyContinue
+  Write-OpLog $ProjectDir "edit" "Invoke-SpecEdit" $Instruction 0 "REJECTED" ([string]$_.Exception.Message)
   Write-EditResult ([pscustomobject]@{
     status = "REJECTED"; reason = [string]$_.Exception.Message
     version = $currentId; questions = @(); gcode_available = $false

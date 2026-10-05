@@ -38,8 +38,34 @@ function Resolve-EIHole($body, $low) {
     }
     return "missing"
   }
-  $hs = Find-EIHoles $body
+  $hs = @(Find-EIHoles $body)
   if ($hs.Count -eq 1) { return $hs[0] }
+  return $null
+}
+
+function Resolve-EIPartition($body, $low) {
+  $m = [regex]::Match($low, '\bp(\d+)\b')
+  if ($m.Success) {
+    foreach ($t in @($body.partitions)) {
+      if ($t -and [string]$t.id -eq ("p" + $m.Groups[1].Value)) { return $t }
+    }
+    return "missing"
+  }
+  $ps = @(@($body.partitions) | Where-Object { $_ -ne $null })
+  if ($ps.Count -eq 1) { return $ps[0] }
+  return $null
+}
+
+function Resolve-EIWedge($body, $low) {
+  $m = [regex]::Match($low, '\bw(\d+)\b')
+  if ($m.Success) {
+    foreach ($t in @($body.wedges)) {
+      if ($t -and [string]$t.id -eq ("w" + $m.Groups[1].Value)) { return $t }
+    }
+    return "missing"
+  }
+  $ws = @(@($body.wedges) | Where-Object { $_ -ne $null })
+  if ($ws.Count -eq 1) { return $ws[0] }
   return $null
 }
 
@@ -55,7 +81,7 @@ function Resolve-EICutout($body, $low) {
   if ($low -match '[o\u00f6]n\b') { $face = "front" }
   elseif ($low -match 'arka') { $face = "rear" }
   elseif ($low -match '[u\u00fc]st\b') { $face = "top" }
-  $cs = Find-EICutouts $body
+  $cs = @(Find-EICutouts $body)
   if ($face -ne "") {
     $fm = @($cs | Where-Object {
       $fb = ([string]$_.face -replace '_short_edge$','' -replace '_long_edge$','')
@@ -74,6 +100,24 @@ function Parse-EditClause($spec, $body, $low) {
   # Silme: "<hedef> kaldir|sil" (feature cozumu sart).
   $dm = [regex]::Match($low, 'kaldir|kald[i\u0131]r|sil\b')
   if ($dm.Success) {
+    if ($low -match 'b[o\u00f6]lme|divider') {
+      $pt = Resolve-EIPartition $body $low
+      if ($null -ne $body.divider_pattern -and ($low -notmatch '\bp\d+\b')) {
+        $ops.Add(@{ op = "remove"; path = ($bid + ".divider_pattern"); old = $null; value = $null; reason = "kaldirma"; requires_confirmation = $true }) | Out-Null
+        return @{ ok = $true; ops = @($ops.ToArray()) }
+      }
+      if ($null -eq $pt) { return @{ ok = $false; message = "hangi bolme? (p1 gibi ID belirt ya da tek bolme olmali)" } }
+      if ($pt -eq "missing") { return @{ ok = $false; message = "bolme bulunamadi" } }
+      $ops.Add(@{ op = "remove"; path = ($bid + ".partitions." + [string]$pt.id); old = $null; value = $null; reason = "kaldirma"; requires_confirmation = $true }) | Out-Null
+      return @{ ok = $true; ops = @($ops.ToArray()) }
+    }
+    if ($low -match 'kama|yuva\s*destegi|destek\s*kama') {
+      $wd = Resolve-EIWedge $body $low
+      if ($null -eq $wd) { return @{ ok = $false; message = "hangi kama? (w1 gibi ID belirt ya da tek kama olmali)" } }
+      if ($wd -eq "missing") { return @{ ok = $false; message = "kama bulunamadi" } }
+      $ops.Add(@{ op = "remove"; path = ($bid + ".wedges." + [string]$wd.id); old = $null; value = $null; reason = "kaldirma"; requires_confirmation = $true }) | Out-Null
+      return @{ ok = $true; ops = @($ops.ToArray()) }
+    }
     if ($low -match 'fillet|yuvarlat') {
       $ops.Add(@{ op = "remove"; path = ($bid + ".edge_notes.fillet"); old = $null; value = $null; reason = "kaldirma"; requires_confirmation = $true }) | Out-Null
       return @{ ok = $true; ops = @($ops.ToArray()) }
@@ -116,14 +160,21 @@ function Parse-EditClause($spec, $body, $low) {
     }) | Out-Null
     return @{ ok = $true; ops = @($ops.ToArray()) }
   }
-  # Gorece tasma: "<hedef> N mm saga/sola/yukari/asagi tasi".
-  $mv = [regex]::Match($low, '(\d+(?:[.,]\d+)?)\s*mm\s*(sa[g\u011f]a|sola|yukar[i\u0131]|a[s\u015f]a[g\u011f][i\u0131])[^.]*?ta[s\u015f][i\u0131]')
+  # Gorece tasma: "<hedef> N mm saga/sola/yukari/asagi tasi|kaydir".
+  $mv = [regex]::Match($low, '(\d+(?:[.,]\d+)?)\s*mm\s*(sa[g\u011f]a|sola|yukar[i\u0131]|a[s\u015f]a[g\u011f][i\u0131])[^.]{0,24}?(ta[s\u015f][i\u0131]|kayd[i\u0131]r|kaydir)')
   if (-not $mv.Success) {
-    $mv = [regex]::Match($low, 'ta[s\u015f][i\u0131][^.]{0,20}?(\d+(?:[.,]\d+)?)\s*mm\s*(sa[g\u011f]a|sola|yukar[i\u0131]|a[s\u015f]a[g\u011f][i\u0131])')
+    $mv = [regex]::Match($low, '(ta[s\u015f][i\u0131]|kayd[i\u0131]r|kaydir)[^.]{0,20}?(\d+(?:[.,]\d+)?)\s*mm\s*(sa[g\u011f]a|sola|yukar[i\u0131]|a[s\u015f]a[g\u011f][i\u0131])')
   }
   if ($mv.Success) {
-    $amt = Get-EINum $mv.Groups[1].Value
-    $dir = [string]$mv.Groups[2].Value
+    $amt = 0; $dir = ""
+    $g1num = [regex]::IsMatch([string]$mv.Groups[1].Value, '^\d+(?:[.,]\d+)?$')
+    if ($g1num) {
+      $amt = Get-EINum $mv.Groups[1].Value
+      $dir = [string]$mv.Groups[2].Value
+    } else {
+      $amt = Get-EINum $mv.Groups[2].Value
+      $dir = [string]$mv.Groups[3].Value
+    }
     $dx = 0; $dy = 0
     if ($dir -match '^sa') { $dx = $amt }
     elseif ($dir -match '^sola') { $dx = -$amt }
@@ -148,7 +199,153 @@ function Parse-EditClause($spec, $body, $low) {
       $ops.Add(@{ op = "replace"; path = ($bid + ".cutouts." + [string]$t.id + ".pos_y_mm"); old = [double]$t.pos_y_mm; value = ([double]$t.pos_y_mm + $dy); reason = "tasi"; requires_confirmation = $false }) | Out-Null
       return @{ ok = $true; ops = @($ops.ToArray()) }
     }
-    return @{ ok = $false; message = "tasi hedefi anlasilmadi (delik/kesit belirt)" }
+    if ($low -match 'kama|telefon\s*yuva|egimli\s*yuva') {
+      $wd = Resolve-EIWedge $body $low
+      if ($null -eq $wd) { return @{ ok = $false; message = "hangi kama tasinacak? (w1 gibi ID belirt)" } }
+      if ($wd -eq "missing") { return @{ ok = $false; message = "kama bulunamadi" } }
+      if ($dx -eq 0 -and $dy -ne 0) { return @{ ok = $false; message = "kama yalnizca yatay tasinabilir (saga/sola); dikey tasma acisal geometriyi bozar" } }
+      $ops.Add(@{ op = "replace"; path = ($bid + ".wedges." + [string]$wd.id + ".x0_mm"); old = [double]$wd.x0_mm; value = ([double]$wd.x0_mm + $dx); reason = "tasi"; requires_confirmation = $false }) | Out-Null
+      $ops.Add(@{ op = "replace"; path = ($bid + ".wedges." + [string]$wd.id + ".x1_mm"); old = [double]$wd.x1_mm; value = ([double]$wd.x1_mm + $dx); reason = "tasi"; requires_confirmation = $false }) | Out-Null
+      return @{ ok = $true; ops = @($ops.ToArray()) }
+    }
+    if ($low -match 'b[o\u00f6]lme|duvar\s*panel|ara\s*duvar') {
+      $pt = Resolve-EIPartition $body $low
+      if ($null -eq $pt) { return @{ ok = $false; message = "hangi bolme tasinacak? (p1 gibi ID belirt)" } }
+      if ($pt -eq "missing") { return @{ ok = $false; message = "bolme bulunamadi" } }
+      if ([string]$pt.axis -eq "x") {
+        $ops.Add(@{ op = "replace"; path = ($bid + ".partitions." + [string]$pt.id + ".y_mm"); old = [double]$pt.y_mm; value = ([double]$pt.y_mm + $dy); reason = "tasi"; requires_confirmation = $false }) | Out-Null
+      } else {
+        $ops.Add(@{ op = "replace"; path = ($bid + ".partitions." + [string]$pt.id + ".x_mm"); old = [double]$pt.x_mm; value = ([double]$pt.x_mm + $dx); reason = "tasi"; requires_confirmation = $false }) | Out-Null
+      }
+      return @{ ok = $true; ops = @($ops.ToArray()) }
+    }
+    return @{ ok = $false; message = "tasi hedefi anlasilmadi (delik/kesit/kama/bolme belirt)" }
+  }
+  # Aci atama: "<hedef> aci N derece yap" (kama/egim).
+  $am = [regex]::Match($low, '(\d+(?:[.,]\d+)?)\s*(derece|\u00b0)')
+  if ($am.Success -and ($low -match 'a[c\u00e7][i\u0131]|e[g\u011f]im|telefon|yuva|kama')) {
+    $aval = Get-EINum $am.Groups[1].Value
+    if ($aval -le 0 -or $aval -gt 45) { return @{ ok = $false; message = "aci 0..45 derece araliginda olmali (girilen: $aval)" } }
+    $wd = Resolve-EIWedge $body $low
+    if ($null -eq $wd) { return @{ ok = $false; message = "acisi degisecek kama bulunamadi (tek kama olmali ya da w1 belirt)" } }
+    if ($wd -eq "missing") { return @{ ok = $false; message = "kama bulunamadi" } }
+    $ops.Add(@{ op = "replace"; path = ($bid + ".wedges." + [string]$wd.id + ".angle_deg"); old = $wd.angle_deg; value = $aval; reason = "aci-ata"; requires_confirmation = $false }) | Out-Null
+    return @{ ok = $true; ops = @($ops.ToArray()) }
+  }
+  # Gorece delta: "<hedef> N mm genislet/kucult/kalinlastir/incelt/derinlestir".
+  $deltaVerbs = 'geni[s\u015f]let|b[u\u00fc]y[u\u00fc]t|k[u\u00fc][c\u00e7][u\u00fc]lt|kucult|incelt|kal[i\u0131]nla[s\u015f]t[i\u0131]r|derinle[s\u015f]t[i\u0131]r|y[u\u00fc]kselt|al[c\u00e7]alt'
+  $dAmt = $null; $dVerb = ""
+  $dmA = [regex]::Match($low, '(\d+(?:[.,]\d+)?)\s*mm\s*(' + $deltaVerbs + ')')
+  if ($dmA.Success) { $dAmt = Get-EINum $dmA.Groups[1].Value; $dVerb = [string]$dmA.Groups[2].Value }
+  else {
+    $dmB = [regex]::Match($low, '(' + $deltaVerbs + ')[^.]{0,24}?(\d+(?:[.,]\d+)?)\s*mm')
+    if ($dmB.Success) { $dAmt = Get-EINum $dmB.Groups[2].Value; $dVerb = [string]$dmB.Groups[1].Value }
+  }
+  if ($null -ne $dAmt) {
+    $dSign = 1
+    if ($dVerb -match 'k[u\u00fc][c\u00e7][u\u00fc]lt|kucult|incelt|al[c\u00e7]alt') { $dSign = -1 }
+    $dTarget = ""
+    if ($low -match 'duvar') { $dTarget = "wall" }
+    elseif ($low -match 'taban') { $dTarget = "bottom" }
+    elseif ($low -match 'kanal|kesit|kesi[k\u011fg]') { $dTarget = "cutwidth" }
+    elseif (($low -match 'deli[k\u011fg]|delik') -and ($low -match '[c\u00e7]ap')) { $dTarget = "holedia" }
+    elseif ($low -match 'geni[s\u015f]li[k\u011fg]') { $dTarget = "width" }
+    elseif ($low -match 'y[u\u00fc]ksekli[k\u011fg]') { $dTarget = "height" }
+    elseif ($low -match 'derinli[k\u011fg]') { $dTarget = "depth" }
+    if ($dTarget -eq "") { return @{ ok = $false; message = "delta hedefi anlasilmadi (duvar/taban/kanal/delik/olcu belirt)" } }
+    if ($dTarget -eq "wall" -and $null -ne $body.hollow) {
+      $nv = [math]::Round([double]$body.hollow.wall_mm + $dSign * $dAmt, 3)
+      $ops.Add(@{ op = "replace"; path = ($bid + ".hollow.wall_mm"); old = $body.hollow.wall_mm; value = $nv; reason = "delta"; requires_confirmation = $false }) | Out-Null
+      return @{ ok = $true; ops = @($ops.ToArray()) }
+    }
+    if ($dTarget -eq "bottom" -and $null -ne $body.hollow) {
+      $nv = [math]::Round([double]$body.hollow.bottom_thickness_mm + $dSign * $dAmt, 3)
+      $ops.Add(@{ op = "replace"; path = ($bid + ".hollow.bottom_thickness_mm"); old = $body.hollow.bottom_thickness_mm; value = $nv; reason = "delta"; requires_confirmation = $false }) | Out-Null
+      return @{ ok = $true; ops = @($ops.ToArray()) }
+    }
+    if ($dTarget -eq "cutwidth") {
+      $t = Resolve-EICutout $body $low
+      if ($null -eq $t -or $t -eq "missing") { return @{ ok = $false; message = "hangi kesit genisletilecek?" } }
+      $nv = [math]::Round([double]$t.width_mm + $dSign * $dAmt, 3)
+      $ops.Add(@{ op = "replace"; path = ($bid + ".cutouts." + [string]$t.id + ".width_mm"); old = $t.width_mm; value = $nv; reason = "delta"; requires_confirmation = $false }) | Out-Null
+      return @{ ok = $true; ops = @($ops.ToArray()) }
+    }
+    if ($dTarget -eq "holedia") {
+      $h = Resolve-EIHole $body $low
+      if ($null -eq $h -or $h -eq "missing") { return @{ ok = $false; message = "hangi delik?" } }
+      $nv = [math]::Round([double]$h.diameter_mm + $dSign * $dAmt, 3)
+      $ops.Add(@{ op = "replace"; path = ($bid + ".holes." + [string]$h.id + ".diameter_mm"); old = $h.diameter_mm; value = $nv; reason = "delta"; requires_confirmation = $false }) | Out-Null
+      return @{ ok = $true; ops = @($ops.ToArray()) }
+    }
+    if ($dTarget -eq "width" -or $dTarget -eq "height" -or $dTarget -eq "depth") {
+      $bf = @{ width = "width_mm"; height = "height_mm"; depth = "depth_mm" }[$dTarget]
+      $cur = $body.base.$bf
+      $nv = [math]::Round([double]$cur + $dSign * $dAmt, 3)
+      $ops.Add(@{ op = "replace"; path = ($bid + ".base." + $bf); old = $cur; value = $nv; reason = "delta"; requires_confirmation = $false }) | Out-Null
+      return @{ ok = $true; ops = @($ops.ToArray()) }
+    }
+    return @{ ok = $false; message = "delta uygulanamadi (hedef alan yok)" }
+  }
+  # Yuzde olcek: "%10 kucult/buyut" (tum govde + ic koordinatlar, uniform).
+  $pcm = [regex]::Match($low, '%\s*(\d+(?:[.,]\d+)?)|y[u\u00fc]zde\s*(\d+(?:[.,]\d+)?)')
+  if ($pcm.Success -and ($low -match 'k[u\u00fc][c\u00e7][u\u00fc]lt|kucult|b[u\u00fc]y[u\u00fc]t|buyut|[o\u00f6]l[c\u00e7]ek')) {
+    $pct = 0
+    if ($pcm.Groups[1].Success -and $pcm.Groups[1].Value -ne "") { $pct = Get-EINum $pcm.Groups[1].Value }
+    else { $pct = Get-EINum $pcm.Groups[2].Value }
+    if ($pct -le 0 -or $pct -ge 90) { return @{ ok = $false; message = "yuzde 1..89 araliginda olmali" } }
+    $factor = 1 + $pct / 100
+    if ($low -match 'k[u\u00fc][c\u00e7][u\u00fc]lt|kucult') { $factor = 1 - $pct / 100 }
+    if ($body.base.shape -ne "box" -and $body.base.shape -ne "rounded_box") { return @{ ok = $false; message = "yuzde olcek yalnizca kutu govdelerde desteklenir" } }
+    $sc = { param($v) [math]::Round([double]$v * $factor, 3) }
+    foreach ($bf in @("width_mm", "depth_mm", "height_mm")) {
+      if ($null -ne $body.base.$bf) {
+        $ops.Add(@{ op = "replace"; path = ($bid + ".base." + $bf); old = $body.base.$bf; value = (& $sc $body.base.$bf); reason = "olcek"; requires_confirmation = $true }) | Out-Null
+      }
+    }
+    if ($null -ne $body.hollow) {
+      if ($null -ne $body.hollow.wall_mm) {
+        $ops.Add(@{ op = "replace"; path = ($bid + ".hollow.wall_mm"); old = $body.hollow.wall_mm; value = (& $sc $body.hollow.wall_mm); reason = "olcek"; requires_confirmation = $true }) | Out-Null
+      }
+      if ($null -ne $body.hollow.bottom_thickness_mm) {
+        $ops.Add(@{ op = "replace"; path = ($bid + ".hollow.bottom_thickness_mm"); old = $body.hollow.bottom_thickness_mm; value = (& $sc $body.hollow.bottom_thickness_mm); reason = "olcek"; requires_confirmation = $true }) | Out-Null
+      }
+    }
+    foreach ($h in (Find-EIHoles $body)) {
+      $ops.Add(@{ op = "replace"; path = ($bid + ".holes." + [string]$h.id + ".diameter_mm"); old = $h.diameter_mm; value = (& $sc $h.diameter_mm); reason = "olcek"; requires_confirmation = $true }) | Out-Null
+      if ($null -ne $h.center_x_mm -and $null -ne $h.center_y_mm) {
+        $ops.Add(@{ op = "replace"; path = ($bid + ".holes." + [string]$h.id + ".center"); old = @([double]$h.center_x_mm, [double]$h.center_y_mm); value = @((& $sc $h.center_x_mm), (& $sc $h.center_y_mm)); reason = "olcek"; requires_confirmation = $true }) | Out-Null
+      }
+    }
+    foreach ($t in (Find-EICutouts $body)) {
+      foreach ($f in @("pos_x_mm", "pos_y_mm", "width_mm", "length_mm", "depth_mm")) {
+        if ($null -ne $t.$f) {
+          $ops.Add(@{ op = "replace"; path = ($bid + ".cutouts." + [string]$t.id + "." + $f); old = $t.$f; value = (& $sc $t.$f); reason = "olcek"; requires_confirmation = $true }) | Out-Null
+        }
+      }
+    }
+    foreach ($pt in @(@($body.partitions) | Where-Object { $_ -ne $null })) {
+      foreach ($f in @("x_mm", "y_mm", "z0_mm", "thickness_mm", "length_mm", "height_mm")) {
+        if ($null -ne $pt.$f) {
+          $ops.Add(@{ op = "replace"; path = ($bid + ".partitions." + [string]$pt.id + "." + $f); old = $pt.$f; value = (& $sc $pt.$f); reason = "olcek"; requires_confirmation = $true }) | Out-Null
+        }
+      }
+    }
+    foreach ($wd in @(@($body.wedges) | Where-Object { $_ -ne $null })) {
+      foreach ($f in @("x0_mm", "x1_mm", "y1_mm", "z0_mm", "height_mm")) {
+        if ($null -ne $wd.$f) {
+          $ops.Add(@{ op = "replace"; path = ($bid + ".wedges." + [string]$wd.id + "." + $f); old = $wd.$f; value = (& $sc $wd.$f); reason = "olcek"; requires_confirmation = $true }) | Out-Null
+        }
+      }
+    }
+    foreach ($cc in @(@($spec.components) | Where-Object { $_ -and [string]$_.id -eq "lid" })) {
+      foreach ($bf in @("width_mm", "depth_mm", "height_mm")) {
+        if ($null -ne $cc.base.$bf) {
+          $ops.Add(@{ op = "replace"; path = ("lid.base." + $bf); old = $cc.base.$bf; value = (& $sc $cc.base.$bf); reason = "olcek"; requires_confirmation = $true }) | Out-Null
+        }
+      }
+    }
+    if ($ops.Count -eq 0) { return @{ ok = $false; message = "olceklenecek olcu bulunamadi" } }
+    return @{ ok = $true; ops = @($ops.ToArray()) }
   }
   # Skaler atama: "<alan> N mm yap".
   $nm = [regex]::Match($low, '(\d+(?:[.,]\d+)?)\s*mm')

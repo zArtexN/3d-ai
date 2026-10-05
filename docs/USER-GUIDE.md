@@ -86,3 +86,25 @@ SORU/CEVAP GECMISI panelinde saklanir.
 - Komut satiri: powershell -File engine\Invoke-Orchestrator.ps1 -Source '50x50x20 kutu' -ProjectName demo (-DryRun, -Resume, -RetryStage).
 - Print (offline) yalnizca hazirlik kaydi acar; yaziciya GONDERMEZ.
 - 3D onizleme: wireframe; surukle=dondur, sag-surukle=tasi, tekerlek=zoom, cift-tik=sifirla. Olculer bbox+ucgen sayisi olarak yazilir.
+
+## V3.1: dogal dille urun tasarimi
+
+- Olcusuz urun tarifi yazabilirsin; Design Planner guvenli varsayimlarla tam spec kurar.
+  Ornek: "Masam icin organizer tasarla. Kalemler icin bolum, telefon icin egimli yuva,
+  sarj kablosu icin kanal olsun. Ustu acik, desteksiz basilsin."
+- Desteklenen niyetler: organizer, telefon standi, kalemlik, tepsi, mutfak caddy
+  (sunger/firca + drenaj), kapakli/kapaksiz kutu,
+  L-braket, kablo tutucu, duvar plakasi, duvar istasyonu.
+- Tum varsayimlar sonuc ekraninda WORKFLOW altinda ve projenin planner.json dosyasinda
+  listelenir. Belirli telefon modeli yazarsan (orn. iPhone 15) olcu sorulur, uydurulmaz.
+- Pipeline artik arka planda calisir (arayuz donmaz); ilerleme rozetlerin yaninda gorunur.
+- HISTORY paneli: Geri Al / Yinele ile surumler arasi gecis (spec.json gercekten geri yuklenir).
+
+## V3.1: dogal dille duzenleme
+
+- Model olustuktan sonra cumleyle degistirebilirsin (ornekler):
+  "Telefon yuvasini 5 mm sola kaydir." / "Telefon acisini 15 derece yap." /
+  "Kablo kanalini 2 mm genislet." / "Tabani 3 mm kalinlastir." /
+  "Organizeri %10 kucult." / "p1 bolmesini kaldir."
+- Her degisiklik spec patch -> dogrulama -> aday geometri -> QA yolundan gecer;
+  basarisizsa REDDEDILIR, mevcut model bozulmaz.

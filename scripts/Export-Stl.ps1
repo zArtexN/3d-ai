@@ -9,12 +9,34 @@
 param(
   [Parameter(Mandatory = $true)][string]$Scad,
   [Parameter(Mandatory = $true)][string]$OutDir,
-  [string]$OpenScadExe = "openscad"
+  [string]$OpenScadExe = "openscad",
+  [int]$TimeoutSec = 300
 )
 
 $ErrorActionPreference = "Stop"
 if (-not (Test-Path -LiteralPath $Scad)) { throw "SCAD bulunamadi: $Scad" }
+if ([string]$Scad -match '"' -or [string]$OutDir -match '"') { throw "guvenlik: yolda tirnak karakteri reddedildi" }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+
+function Invoke-WithTimeout($exe, $arguments, $timeoutSec, $label) {
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = $exe
+  $psi.Arguments = $arguments
+  $psi.UseShellExecute = $false
+  $psi.RedirectStandardOutput = $true
+  $psi.RedirectStandardError = $true
+  $psi.CreateNoWindow = $true
+  $proc = [System.Diagnostics.Process]::Start($psi)
+  if (-not $proc.WaitForExit($timeoutSec * 1000)) {
+    try { $proc.Kill() } catch { }
+    throw ($label + " zaman asimina ugradi (" + $timeoutSec + " sn); islem durduruldu.")
+  }
+  if ($proc.ExitCode -ne 0) {
+    $err = ""
+    try { $err = $proc.StandardError.ReadToEnd() } catch { }
+    throw ($label + " basarisiz (kod " + $proc.ExitCode + "). " + $err)
+  }
+}
 
 try { & $OpenScadExe --version 2>&1 | Out-Null }
 catch { throw "OpenSCAD bulunamadi ('$OpenScadExe'). Lutfen OpenSCAD kurun ve PATH'e ekleyin." }
@@ -22,12 +44,9 @@ catch { throw "OpenSCAD bulunamadi ('$OpenScadExe'). Lutfen OpenSCAD kurun ve PA
 $stl = Join-Path $OutDir "model.stl"
 $mf  = Join-Path $OutDir "model.3mf"
 
-& $OpenScadExe -o $stl $Scad
-if ($LASTEXITCODE -ne 0) { throw "STL export basarisiz." }
-
+Invoke-WithTimeout $OpenScadExe ('-o "' + $stl + '" "' + $Scad + '"') $TimeoutSec "STL export"
 try {
-  & $OpenScadExe -o $mf $Scad
-  if ($LASTEXITCODE -ne 0) { Write-Warning "3MF export atlandi (OpenSCAD surumu desteklemiyor olabilir)." }
-} catch { Write-Warning "3MF export atlandi: $_" }
+  Invoke-WithTimeout $OpenScadExe ('-o "' + $mf + '" "' + $Scad + '"') $TimeoutSec "3MF export"
+} catch { Write-Warning ("3MF export atlandi: " + $_.Exception.Message) }
 
 Write-Output "OK: $stl"

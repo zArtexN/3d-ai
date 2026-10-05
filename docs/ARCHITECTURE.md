@@ -64,6 +64,30 @@ Project (project.json + README parca listesi; slice YOK, G-code YOK)
 - YENI (V1.1): `[pscustomobject]@{...}` cast icine `List<T>` konmaz; once `.ToArray()`.
 - YENI (V1.1): dairesel yuzeylerde `$fn = 96` sart (faset bbox kaymasin).
 - WARNING asla FAIL yapmaz; kullanici degeri asla otomatik degismez.
+- YENI (V3.1): `@($list).Count` / `@($list)` kalibi `List<T>` degiskenlerde ArgumentException
+  verir (dizi degiskenlerde sorunsuz). `List<T>` icin `.Count` / `.ToArray()` dogrudan
+  kullanilir; `@()` yalnizca skaler ve gercek dizilere uygulanir.
+- YENI (V3.1): ConvertFrom-Json nesnelerinde mevcut olmayan ozellige dogrudan atama
+  (`$o.yeniOzellik = ...`) PS5.1'de patlayabilir; taze `[pscustomobject]$hash` kurulumu
+  veya mevcut ozellige atama kullanilir.
+
+## V3.1 katmani (design planner + urun geometrisi + async UI)
+
+- engine/Invoke-DesignPlanner.ps1 v2.0: parser sonrasi calisir; organizer/phone_stand/
+  pen_holder/tray/caddy/box(+lid)/bracket/cable_clip/wall_plate/wall_station niyetleri. Govde olcusu varsa
+  calismaz (hassas istek korunur). Tum varsayimlar spec.planner.assumptions'da.
+- Yeni spec alanlari (schemas/designspec.schema.json): partitions (ozel konumlu ic duvar),
+  wedges (aci-gudumlu kama prizmasi, angle_driven), planner (karar kaydi).
+- Geometry.ps1: New-GWedge (polyhedron, 2021.01), New-GHollowRoundedBox (gercek radius,
+  minkowski). Chamfer geometrik uygulanmaz (WARNING).
+- Delik cikis duzlemi: hollow+acik tabanda (floor), hollow'suz kutuda govde ustunde,
+  kapali kutuda parca tepesinde (birlesim bbox degil).
+- NL editing (EditIntent.ps1 + DesignSpecPatch.ps1): delta/yuzde/aci/tasima/kaldirma;
+  kama+bolme hedefleri; undo/redo spec.json'u geri yukler (ProjectVersions.ps1).
+- app/DesignerV1.ps1: async pipeline (Start-Job + Timer, 10 dk timeout), WORKFLOW
+  asamalari (gercek artefaktlardan), HISTORY (Geri Al/Yinele), viewer tooltip/kisayol,
+  facet limiti 20000, fade-in. Test modlari (-UITest/-ValidateUI/-SelfTest) senkron
+  yolda kalir.
 
 ## V3.0 katmani (orkestrator + workstation)
 

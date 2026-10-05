@@ -9,9 +9,15 @@ function Test-PathSafe($RootDir, $CandidatePath) {
   }
   try {
     $rootFull = [System.IO.Path]::GetFullPath([string]$RootDir)
+    $sep = [string][System.IO.Path]::DirectorySeparatorChar
+    $rootPrefix = $rootFull
+    if (-not $rootPrefix.EndsWith($sep)) { $rootPrefix += $sep }
     $candFull = [System.IO.Path]::GetFullPath(
       [System.IO.Path]::Combine($rootFull, ([string]$CandidatePath)))
-    if (-not $candFull.StartsWith($rootFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if ($candFull.Equals($rootFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+      return @{ ok = $true; resolved = $candFull; reason = "" }
+    }
+    if (-not $candFull.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
       return @{ ok = $false; resolved = ""; reason = "kok disina cikis engellendi" }
     }
     return @{ ok = $true; resolved = $candFull; reason = "" }

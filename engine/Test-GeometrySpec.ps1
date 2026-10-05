@@ -67,6 +67,11 @@ foreach ($c in @($gspecObj.components)) {
   }
   elseif ($shape -eq "rounded_box") {
     Need-Pos $b.width_mm "width_mm"; Need-Pos $b.depth_mm "depth_mm"; Need-Pos $b.height_mm "height_mm"; Need-Pos $b.radius_mm "radius_mm"
+    if ($null -ne $b.radius_mm -and $bw -gt 0 -and $bd -gt 0 -and $bh -gt 0) {
+      if (2 * [double]$b.radius_mm -gt [math]::Min($bw, [math]::Min($bd, $bh))) {
+        $errors.Add("($cid) radius cok buyuk: 2*r en kucuk olcuyu asiyor")
+      }
+    }
   }
 
   $bw = 0; $bd = 0; $bh = 0
@@ -75,7 +80,7 @@ foreach ($c in @($gspecObj.components)) {
   if ($null -ne $c.hollow) {
     $wl = $c.hollow.wall_mm
     if ($null -eq $wl -or [double]$wl -le 0) { $errors.Add("($cid) hollow.wall_mm kritik olcu eksik/gecersiz -> model olusturulamaz") }
-    elseif ($shape -ne "box") { $errors.Add("($cid) hollow sadece box tabanda desteklenir") }
+    elseif ($shape -ne "box" -and $shape -ne "rounded_box") { $errors.Add("($cid) hollow sadece box/rounded_box tabanda desteklenir") }
     elseif (2 * [double]$wl -ge $bw -or 2 * [double]$wl -ge $bd -or [double]$wl -ge $bh) {
       $errors.Add("($cid) hollow imkansiz: duvar $wl govdeye sigmyor (FAIL)")
     }
@@ -102,6 +107,77 @@ foreach ($c in @($gspecObj.components)) {
     if ($null -ne $dpat.top_gap_mm -and [double]$dpat.top_gap_mm -lt 0) { $errors.Add("($cid) divider_pattern.top_gap_mm negatif olamaz") }
   }
 
+  # Adim E (planner v1.0): partitions + wedges govde-ici elemanlar (ek, additive).
+  # Kurallar: pozitiflik, ic-bosluk icinde kalma, birbirini icten kesmeme.
+  $planEps = 0.15
+  $cavX0 = 0; $cavX1 = $bw; $cavY0 = 0; $cavY1 = $bd
+  $cavZ0 = 0
+  if ($null -ne $c.hollow -and $null -ne $c.hollow.wall_mm) {
+    $wlP = [double]$c.hollow.wall_mm
+    $cavX0 = $wlP; $cavX1 = $bw - $wlP; $cavY0 = $wlP; $cavY1 = $bd - $wlP
+    $btP = $wlP
+    if ($null -ne $c.hollow.bottom_thickness_mm) { $btP = [double]$c.hollow.bottom_thickness_mm }
+    $cavZ0 = $btP
+  }
+  $footprints = New-Object System.Collections.Generic.List[object]
+  foreach ($pt in @($c.partitions)) {
+    if ($null -eq $pt) { continue }
+    $ptn = [string]$pt.id
+    if ($null -eq $pt.thickness_mm -or [double]$pt.thickness_mm -le 0) { $errors.Add("($cid) partition '$ptn': thickness pozitif olmali") ; continue }
+    if ($null -eq $pt.length_mm -or [double]$pt.length_mm -le 0) { $errors.Add("($cid) partition '$ptn': length pozitif olmali") ; continue }
+    if ($null -eq $pt.height_mm -or [double]$pt.height_mm -le 0) { $errors.Add("($cid) partition '$ptn': height pozitif olmali") ; continue }
+    $fx0 = [double]$pt.x_mm; $fy0 = [double]$pt.y_mm; $fz0 = [double]$pt.z0_mm
+    if ([string]$pt.axis -eq "x") { $fx1 = $fx0 + [double]$pt.length_mm; $fy1 = $fy0 + [double]$pt.thickness_mm }
+    elseif ([string]$pt.axis -eq "y" -or [string]$pt.axis -eq "") { $fx1 = $fx0 + [double]$pt.thickness_mm; $fy1 = $fy0 + [double]$pt.length_mm }
+    else { $errors.Add("($cid) partition '$ptn': axis x veya y olmali") ; continue }
+    $fz1 = $fz0 + [double]$pt.height_mm
+    if ($fx0 -lt ($cavX0 - $planEps) -or $fx1 -gt ($cavX1 + $planEps) -or $fy0 -lt ($cavY0 - $planEps) -or $fy1 -gt ($cavY1 + $planEps)) {
+      $errors.Add("($cid) partition '$ptn': ic bosluk disina tasiyor")
+    }
+    if ($fz0 -lt ($cavZ0 - $planEps) -or $fz0 -gt ($bh + $planEps)) {
+      $errors.Add("($cid) partition '$ptn': tabana/govdeye baglanmiyor (z0 disinda)")
+    }
+    if ($fz1 -le $fz0) {
+      $errors.Add("($cid) partition '$ptn': yukseklik pozitif olmali")
+    }
+    $footprints.Add([pscustomobject]@{ id = $ptn; x0 = $fx0; x1 = $fx1; y0 = $fy0; y1 = $fy1; z0 = $fz0; z1 = $fz1 }) | Out-Null
+  }
+  foreach ($wd in @($c.wedges)) {
+    if ($null -eq $wd) { continue }
+    $wid = [string]$wd.id
+    if ($null -eq $wd.x1_mm -or $null -eq $wd.x0_mm -or [double]$wd.x1_mm -le [double]$wd.x0_mm) { $errors.Add("($cid) wedge '$wid': x1 > x0 olmali") ; continue }
+    if ($null -eq $wd.y1_mm -or $null -eq $wd.y0_mm -or [double]$wd.y1_mm -le [double]$wd.y0_mm) { $errors.Add("($cid) wedge '$wid': y1 > y0 olmali") ; continue }
+    if ($null -eq $wd.height_mm -or [double]$wd.height_mm -le 0) { $errors.Add("($cid) wedge '$wid': height pozitif olmali") ; continue }
+    if ($null -eq $wd.angle_deg -or [double]$wd.angle_deg -le 0 -or [double]$wd.angle_deg -gt 45) { $errors.Add("($cid) wedge '$wid': angle 0..45 aradir") ; continue }
+    $wx0 = [double]$wd.x0_mm; $wx1 = [double]$wd.x1_mm
+    $wy0 = [double]$wd.y0_mm; $wy1 = [double]$wd.y1_mm
+    if ($wd.angle_driven -eq $true) {
+      $wy0 = $wy1 - [double]$wd.height_mm * [math]::Tan([double]$wd.angle_deg * [math]::PI / 180.0)
+    }
+    $wz0 = [double]$wd.z0_mm; $wz1 = $wz0 + [double]$wd.height_mm
+    if ($wx0 -lt ($cavX0 - $planEps) -or $wx1 -gt ($cavX1 + $planEps) -or $wy0 -lt ($cavY0 - $planEps) -or $wy1 -gt ($cavY1 + $planEps)) {
+      $errors.Add("($cid) wedge '$wid': ic bosluk disina tasiyor")
+    }
+    if ($wz0 -lt ($cavZ0 - $planEps) -or $wz0 -gt ($bh + $planEps)) {
+      $errors.Add("($cid) wedge '$wid': tabana/govdeye baglanmiyor (z0 disinda)")
+    }
+    if ($wz1 -le $wz0) {
+      $errors.Add("($cid) wedge '$wid': yukseklik pozitif olmali")
+    }
+    $footprints.Add([pscustomobject]@{ id = $wid; x0 = $wx0; x1 = $wx1; y0 = $wy0; y1 = $wy1; z0 = $wz0; z1 = $wz1 }) | Out-Null
+  }
+  for ($fi = 0; $fi -lt $footprints.Count; $fi++) {
+    for ($fj = ($fi + 1); $fj -lt $footprints.Count; $fj++) {
+      $a = $footprints[$fi]; $b = $footprints[$fj]
+      $ox = [math]::Min($a.x1, $b.x1) - [math]::Max($a.x0, $b.x0)
+      $oy = [math]::Min($a.y1, $b.y1) - [math]::Max($a.y0, $b.y0)
+      $oz = [math]::Min($a.z1, $b.z1) - [math]::Max($a.z0, $b.z0)
+      if ($ox -gt 0.2 -and $oy -gt 0.2 -and $oz -gt 0.2) {
+        $errors.Add("($cid) planner elemanlari cakisiyor: $($a.id) + $($b.id) (ic-ice gecme, manifold riski)")
+      }
+    }
+  }
+
   # Adim C: cozumlulmus pattern kapsadigi deliklerin merkezini compiler uretir (gate atlar).
   $hpOK = ($null -ne $c.hole_pattern -and ([string]$c.hole_pattern.type -eq "corner_pattern" -or [string]$c.hole_pattern.type -eq "mid_edge") -and [int]$c.hole_pattern.count -ge 1 -and $null -ne $c.hole_pattern.diameter_mm -and $null -ne $c.hole_pattern.edge_offset_mm -and $bw -gt 0 -and $bd -gt 0)
 
@@ -117,7 +193,7 @@ foreach ($c in @($gspecObj.components)) {
     # Pattern kapsiyor ve merkez henuz bos: compiler cozuyor; merkez-bagimli
     # kontroller (eksen-disi konum) atlanir, merkezsiz kontroller calisir.
     $deferC = ($hpOK -and $null -ne $h.placement -and ($null -eq $h.center_x_mm -or $null -eq $h.center_y_mm))
-    if ($h.axis -and $h.axis -ne "z") { $errors.Add("($cid) delik '$hid': su an sadece z ekseni desteklenir"); continue }
+    if ($h.axis -and $h.axis -ne "z" -and $h.axis -ne "y") { $errors.Add("($cid) delik '$hid': eksen z veya y olmali"); continue }
     $ht = "through"; if ($h.hole_type) { $ht = [string]$h.hole_type }
     if ($ht -eq "blind") {
       if ($null -eq $h.depth_mm -or [double]$h.depth_mm -le 0) { $errors.Add("($cid) delik '$hid': blind depth eksik") }
@@ -128,8 +204,15 @@ foreach ($c in @($gspecObj.components)) {
     if ($shape -eq "box" -and $bw -gt 0 -and $bd -gt 0 -and -not $deferC) {
       $rr = $dd / 2
       $cx = [double]$h.center_x_mm; $cy = [double]$h.center_y_mm
-      if (($cx - $rr) -lt 0 -or ($cx + $rr) -gt $bw -or ($cy - $rr) -lt 0 -or ($cy + $rr) -gt $bd) {
-        $errors.Add("($cid) delik '$hid': govde disinda kaliyor")
+      if ([string]$h.axis -eq "y") {
+        # Y-ekseni deligi: cx=X, cy=Z; X govde genisliginde, Z govde yuksekliginde olmali.
+        if (($cx - $rr) -lt 0 -or ($cx + $rr) -gt $bw -or ($cy - $rr) -lt 0 -or ($cy + $rr) -gt $bh) {
+          $errors.Add("($cid) delik '$hid': govde disinda kaliyor")
+        }
+      } else {
+        if (($cx - $rr) -lt 0 -or ($cx + $rr) -gt $bw -or ($cy - $rr) -lt 0 -or ($cy + $rr) -gt $bd) {
+          $errors.Add("($cid) delik '$hid': govde disinda kaliyor")
+        }
       }
     }
   }

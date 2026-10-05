@@ -102,6 +102,38 @@ try {
   Write-PLog $ProjectDir "parser.log" ("CANONICAL-FAIL " + $_.Exception.Message)
 }
 
+# 1a2. Design Planner (urun-tasarim niyeti): parser'in bos biraktigi olculeri
+# guvenli varsayimla tamamlar. Hassas isteklere dokunmaz; sadece dogrulanmis
+# DesignSpec geometry engine'e gider. Belirli telefon modeli -> NEEDS_INPUT.
+if ($Prompt.Trim() -ne "") {
+  try {
+    $plannerTxt = & (Join-Path $EngineDir "Invoke-DesignPlanner.ps1") -SpecFile $specPath -Prompt $Prompt 2>&1 | Out-String
+    $plannerRep = $plannerTxt | ConvertFrom-Json
+    if ($null -ne $plannerRep -and $plannerRep.applied -eq $true) {
+      Write-PLog $ProjectDir "parser.log" "PLANNER-OK design-planner/1.0 spec=spec.json planner=planner.json"
+      $canonSpec = Get-Content -LiteralPath $specPath -Raw | ConvertFrom-Json
+    } elseif ($null -ne $plannerRep -and [string]$plannerRep.needs_input -ne "") {
+      Write-PLog $ProjectDir "parser.log" ("PLANNER-NEEDS-INPUT " + [string]$plannerRep.needs_input)
+      $qsNeedTxt = & (Join-Path $EngineDir "Get-SpecQuestions.ps1") -SpecFile $specPath -AsJson 2>&1 | Out-String
+      $qsNeedRaw = $qsNeedTxt | ConvertFrom-Json
+      $qsNeed = @($qsNeedRaw | Where-Object { $_ -ne $null })
+      @($qsNeed) | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $qPath -Encoding UTF8
+      Write-PResult ([pscustomobject]@{
+        status = "NEEDS_INPUT"; stage = "planner"; provider = $providerName
+        reason = [string]$plannerRep.needs_input
+        errors = @(); questions = @($qsNeed)
+        parts = @(); gcode_available = $false
+      }) 3
+    } else {
+      $skipWhy = "planner niyeti yok"
+      if ($null -ne $plannerRep -and [string]$plannerRep.reason -ne "") { $skipWhy = [string]$plannerRep.reason }
+      Write-PLog $ProjectDir "parser.log" ("PLANNER-SKIP " + $skipWhy)
+    }
+  } catch {
+    Write-PLog $ProjectDir "parser.log" ("PLANNER-FAIL " + $_.Exception.Message)
+  }
+}
+
 # Stale tespiti (uyari; silme YOK, kullanici dosyalarina dokunulmaz):
 # spec'te olmayan div* uretim dosyalari (eski model kalintisi) raporlanir.
 $staleList = New-Object System.Collections.Generic.List[string]

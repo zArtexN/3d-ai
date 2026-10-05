@@ -117,6 +117,42 @@
               "status": { "enum": ["ok", "missing"] }
             }
           },
+          "partitions": {
+            "type": ["array", "null"],
+            "description": "v2.2/planner: ozel konumlu govde-ici duvarlar. axis=y: X'te ince Y boyunca; axis=x: Y'de ince X boyunca.",
+            "items": {
+              "type": "object",
+              "required": ["id", "thickness_mm", "length_mm", "height_mm"],
+              "properties": {
+                "id": { "type": "string" },
+                "axis": { "enum": ["x", "y"] },
+                "x_mm": { "type": ["number", "null"] },
+                "y_mm": { "type": ["number", "null"] },
+                "z0_mm": { "type": ["number", "null"] },
+                "thickness_mm": { "type": "number" },
+                "length_mm": { "type": "number" },
+                "height_mm": { "type": "number" }
+              }
+            }
+          },
+          "wedges": {
+            "type": ["array", "null"],
+            "description": "v2.2/planner: X boyunca ekstruzyonlu dik-ucgen prizma (telefon yaslanma destegi).",
+            "items": {
+              "type": "object",
+              "required": ["id", "x0_mm", "x1_mm", "y0_mm", "y1_mm", "z0_mm", "height_mm"],
+              "properties": {
+                "id": { "type": "string" },
+                "x0_mm": { "type": "number" },
+                "x1_mm": { "type": "number" },
+                "y0_mm": { "type": "number" },
+                "y1_mm": { "type": "number" },
+                "z0_mm": { "type": "number" },
+                "height_mm": { "type": "number" },
+                "angle_deg": { "type": ["number", "null"] }
+              }
+            }
+          },
           "pending_rotate": { "type": ["number", "null"], "description": "Ekseni sorulan rotate acisi (soru cevaplaninca transforms'a tasinir)" },
           "pending_mirror": { "type": "boolean", "description": "Ekseni sorulan ayna isareti" },
           "expected_bbox": { "type": ["object", "null"], "properties": { "min": { "type": "array", "items": { "type": "number" } }, "max": { "type": "array", "items": { "type": "number" } } } }
@@ -149,6 +185,10 @@
         }
       }
     },
-    "material": { "type": ["string", "null"] }
+    "material": { "type": ["string", "null"] },
+    "planner": {
+      "type": ["object", "null"],
+      "description": "design-planner/1.0: tum varsayimlar kayitlidir; sessiz uydurma yasagi bu blokla denetlenir."
+    }
   }
 }

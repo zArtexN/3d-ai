@@ -216,7 +216,7 @@ function Invoke-Stage-design {
     $rec.output = "NEEDS_INPUT"
     $script:ctx.Questions = @($res.questions)
     foreach ($q in @($res.questions)) {
-      $rec.warnings += @("soru: " + [string]$q.id + " - " + [string]$q.message)
+      $rec.warnings += @("soru: " + [string]$q.question_id + " - " + [string]$q.question)
     }
     return (Close-Stage $rec "NEEDS_INPUT")
   }

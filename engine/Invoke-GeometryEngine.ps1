@@ -155,6 +155,9 @@ foreach ($c in @($gspecObj.components)) {
       $paramLines.Add("width = " + (Format-Num $ew) + ";")
       $paramLines.Add("depth = " + (Format-Num $ed) + ";")
       $paramLines.Add("height = " + (Format-Num ([double]$b.height_mm)) + ";")
+      if ($shape -eq "rounded_box" -and $null -ne $b.radius_mm) {
+        $paramLines.Add("corner_radius = " + (Format-Num ([double]$b.radius_mm)) + ";")
+      }
     } else {
       foreach ($k in @("width_mm", "depth_mm", "height_mm", "diameter_mm", "outer_diameter_mm", "inner_diameter_mm", "radius_mm")) {
         if ($null -ne $b.$k) { $paramLines.Add(($k -replace "_mm$", "") + " = " + (Format-Num ([double]$b.$k)) + ";") }
@@ -195,7 +198,11 @@ foreach ($c in @($gspecObj.components)) {
 
     # --- hollow ---
     if ($null -ne $c.hollow) {
-      $hb = New-GHollowBox $ew $ed $hh ([double]$c.hollow.wall_mm) ([bool]$c.hollow.open_top) $c.hollow.bottom_thickness_mm
+      if ($shape -eq "rounded_box") {
+        $hb = New-GHollowRoundedBox $ew $ed $hh ([double]$c.hollow.wall_mm) ([double]$b.radius_mm) ([bool]$c.hollow.open_top) $c.hollow.bottom_thickness_mm
+      } else {
+        $hb = New-GHollowBox $ew $ed $hh ([double]$c.hollow.wall_mm) ([bool]$c.hollow.open_top) $c.hollow.bottom_thickness_mm
+      }
       if (-not $hb.ok) { throw $hb.reason }
       $paramLines.Add("wall_thickness = " + (Format-Num ([double]$c.hollow.wall_mm)) + ";")
       $geo = $hb
@@ -205,11 +212,15 @@ foreach ($c in @($gspecObj.components)) {
     foreach ($h in @($c.holes)) {
       if ($null -eq $h) { continue }
       $ht = "through"; if ($h.hole_type) { $ht = [string]$h.hole_type }
+      $hAxis = "z"; if ($h.axis) { $hAxis = [string]$h.axis }
       $extra = $null
       if ($ht -eq "blind") { $extra = [pscustomobject]@{ depth = [double]$h.depth_mm } }
       elseif ($ht -eq "countersink") { $extra = [pscustomobject]@{ cs_dia = [double]$h.cs_dia_mm; cs_depth = [double]$h.cs_depth_mm } }
       elseif ($ht -eq "counterbore") { $extra = [pscustomobject]@{ cb_dia = [double]$h.cb_dia_mm; cb_depth = [double]$h.cb_depth_mm } }
-      $gh = New-GHole ([double]$h.diameter_mm) ([double]$h.center_x_mm) ([double]$h.center_y_mm) $hh $ht $extra
+      # Yuz-tabanli delik (axis=y): bodyH = dd (derinlik Y). Koordinatlar: x=center_x, y=center_y (Z konumu).
+      $hBodyH = $hh
+      if ($hAxis -eq "y") { $hBodyH = $dd }
+      $gh = New-GHole ([double]$h.diameter_mm) ([double]$h.center_x_mm) ([double]$h.center_y_mm) $hBodyH $ht $extra $hAxis
       $cuts.Add($gh)
       $paramLines.Add("hole_" + [string]$h.id + "_dia = " + (Format-Num ([double]$h.diameter_mm)) + ";")
       $paramLines.Add("hole_" + [string]$h.id + "_x = " + (Format-Num ([double]$h.center_x_mm)) + ";")
@@ -276,6 +287,32 @@ foreach ($c in @($gspecObj.components)) {
       }
     }
 
+    # --- planner partisyonlari + kamalar (v1.0, additive; divider yolu ayni Merge-G) ---
+    # partitions: axis=y -> X'te ince, Y boyunca uzun (bolme); axis=x -> Y'de ince, X boyunca (dudak).
+    foreach ($pt in @($c.partitions)) {
+      if ($null -eq $pt) { continue }
+      if ([string]$pt.axis -eq "x") {
+        $gb = New-GBox ([double]$pt.length_mm) ([double]$pt.thickness_mm) ([double]$pt.height_mm)
+      } else {
+        $gb = New-GBox ([double]$pt.thickness_mm) ([double]$pt.length_mm) ([double]$pt.height_mm)
+      }
+      $gb = Move-G $gb ([double]$pt.x_mm) ([double]$pt.y_mm) ([double]$pt.z0_mm)
+      $paramLines.Add("partition_" + [string]$pt.id + "_x = " + (Format-Num ([double]$pt.x_mm)) + ";")
+      $geo = Merge-G(@(@($geo) + @($gb)))
+      $divBoxes.Add([pscustomobject]@{ id = [string]$pt.id; bmin = @($gb.bmin); bmax = @($gb.bmax) }) | Out-Null
+    }
+    foreach ($wd in @($c.wedges)) {
+      if ($null -eq $wd) { continue }
+      $ewy0 = [double]$wd.y0_mm
+      if ($wd.angle_driven -eq $true -and $null -ne $wd.angle_deg) {
+        $ewy0 = [double]$wd.y1_mm - [double]$wd.height_mm * [math]::Tan([double]$wd.angle_deg * [math]::PI / 180.0)
+      }
+      $gw = New-GWedge ([double]$wd.x0_mm) ([double]$wd.x1_mm) $ewy0 ([double]$wd.y1_mm) ([double]$wd.z0_mm) ([double]$wd.height_mm)
+      $paramLines.Add("wedge_" + [string]$wd.id + "_angle = " + (Format-Num ([double]$wd.angle_deg)) + ";")
+      $geo = Merge-G(@(@($geo) + @($gw)))
+      $divBoxes.Add([pscustomobject]@{ id = [string]$wd.id; bmin = @($gw.bmin); bmax = @($gw.bmax) }) | Out-Null
+    }
+
     # --- kenar notlari (uygulanmaz, uyarilir) ---
     foreach ($e in @($c.edge_notes)) {
       if ($null -eq $e) { continue }
@@ -307,6 +344,8 @@ foreach ($c in @($gspecObj.components)) {
     foreach ($fh in @($c.holes)) { if ($fh -and $fh.id) { $featIds += [string]$fh.id } }
     foreach ($ft in @($c.cutouts)) { if ($ft -and $ft.id) { $featIds += [string]$ft.id } }
     if ($null -ne $c.divider_pattern) { $featIds += ("dividers:" + [string]$c.divider_pattern.count) }
+    foreach ($fp in @($c.partitions)) { if ($fp -and $fp.id) { $featIds += [string]$fp.id } }
+    foreach ($fw in @($c.wedges)) { if ($fw -and $fw.id) { $featIds += [string]$fw.id } }
     $noteLines.Add(("spec: v" + $specVerNote + "; features: " + ($featIds -join ",")))
     $doc = Build-ScadDocument ($gspecObj.project_name + " / " + $cid) $paramLines.ToArray() @($geo.scad) $noteLines.ToArray()
     $cadDir = Join-Path $ProjectDir "cad"
@@ -338,10 +377,15 @@ foreach ($c in @($gspecObj.components)) {
       $baseArgs = @{ Stl = $stl; Tolerance = $MeasurementTolerance; ExpMinX = [double]$expMin[0]; ExpMinY = [double]$expMin[1]; ExpMinZ = [double]$expMin[2]; ExpMaxX = [double]$expMax[0]; ExpMaxY = [double]$expMax[1]; ExpMaxZ = [double]$expMax[2] }
       $throughHoles = @(@($c.holes) | Where-Object { $_ -and (-not $_.hole_type -or [string]$_.hole_type -eq "through" -or [string]$_.hole_type -eq "clearance") })
       $blindHoles = @(@($c.holes) | Where-Object { $_ -and [string]$_.hole_type -eq "blind" })
-      # Cikis duzlemi: hollow+acik govdede delik tabanda biter (floor);
+      # Cikis duzlemi: deligin gectigi malzemenin ustu (birlesim bbox degil).
+      # hollow+acik govdede delik tabanda biter (floor);
+      # hollow-olmayan kutuda taban plaka ustunde (govde yuksekligi);
       # kapali/hollow-olmayan parcalarda parca tepesi (mevcut davranis).
       $exitZ = [double]$expMax[2]
-      if ($null -ne $c.hollow -and $c.hollow.open_top -eq $true -and $null -ne $c.hollow.wall_mm) {
+      if (($shape -eq "box" -or $shape -eq "rounded_box") -and $null -eq $c.hollow) {
+        $exitZ = $hh
+      }
+      elseif ($null -ne $c.hollow -and $c.hollow.open_top -eq $true -and $null -ne $c.hollow.wall_mm) {
         $btX = $null
         if ($null -ne $c.hollow.bottom_thickness_mm) { $btX = $c.hollow.bottom_thickness_mm }
         $exitZ = Get-HollowFloor ([double]$c.hollow.wall_mm) $btX
@@ -353,6 +397,11 @@ foreach ($c in @($gspecObj.components)) {
         if ($res.code -ne 0) { $worst = "FAIL" } elseif ($lastVerify -match "WARNING") { $worst = "WARNING" }
       } else {
         foreach ($h in $throughHoles) {
+          # Y-ekseni delikleri: Verify-Stl Z-duzlemi tabanli; Y-ekseni deligi dogrulanamaz (UNVERIFIED).
+          if ([string]$h.axis -eq "y") {
+            $holeChecks += [pscustomobject]@{ id = [string]$h.id; result = "UNVERIFIED"; reason = "y-ekseni deligi: Z-duzlemi dogrulamasi uygulanamaz"; expected_diameter = [double]$h.diameter_mm; expected_center = @([double]$h.center_x_mm, [double]$h.center_y_mm) }
+            continue
+          }
           $hargs = $baseArgs.Clone()
           $hargs.CheckHole = $true
           $hargs.HoleCX = [double]$h.center_x_mm
@@ -380,14 +429,18 @@ foreach ($c in @($gspecObj.components)) {
           $lastVerify = $txt
         }
         foreach ($h in $blindHoles) {
-          # Kor delik: giris parca tepesinde, dip delik tabaninda aranir.
+          # Kor delik: giris delik gecis ustunde, dip delik tabaninda aranir.
+          $blindTop = [double]$expMax[2]
+          if (($shape -eq "box" -or $shape -eq "rounded_box") -and $null -eq $c.hollow) {
+            $blindTop = $hh
+          }
           $hargs = $baseArgs.Clone()
           $hargs.CheckHole = $true
           $hargs.HoleCX = [double]$h.center_x_mm
           $hargs.HoleCY = [double]$h.center_y_mm
           $hargs.HoleDiameter = [double]$h.diameter_mm
-          $hargs.HoleZTop = [double]$expMax[2]
-          $hargs.HoleZBottom = ([double]$expMax[2] - [double]$h.depth_mm)
+          $hargs.HoleZTop = $blindTop
+          $hargs.HoleZBottom = ($blindTop - [double]$h.depth_mm)
           $res = Run-GVerify $hargs
           $txt = $res.text
           $rr2 = "PASS"; if ($res.code -ne 0) { $rr2 = "FAIL" } elseif ($txt -match "WARNING") { $rr2 = "WARNING" }

@@ -292,6 +292,36 @@ Invoke-ParserCase "P22-org-holes" $p22 {
   return @{ ok = $ok; detail = $(if ($ok) { "complex organizer tam parse" } else { "d=$dOk h=$hOk noDia=$noDiaQ noTop=$noTopQ holes=$hOk div=$divOk cut=$cutOk pad=$padOk edge=$edgeOk" }) }
 }
 
+# P-REGR-1: "120x80x45" olculeri duz prompt icinde tanimlaniyor -> dims sorusu olusmasin
+Invoke-ParserCase "P-REGR-1-dims-plain" "120x80x45 kutu olustur" {
+  param($s, $q)
+  $b = $s.components[0].base
+  $dOk = ([double]$b.width_mm -eq 120 -and [double]$b.depth_mm -eq 80 -and [double]$b.height_mm -eq 45)
+  $noDimsQ = (@($q | Where-Object { $_.kind -eq "dims" }).Count -eq 0)
+  $ok = ($dOk -and $noDimsQ)
+  return @{ ok = $ok; detail = $(if ($ok) { "120x80x45 parse edildi, dims sorusu yok" } else { "w=$($b.width_mm) d=$($b.depth_mm) h=$($b.height_mm) noDimsQ=$noDimsQ" }) }
+}
+
+# P-REGR-2: "120x80x45 mm" (mm-sonrali) olculeri tanimlaniyor -> dims sorusu olusmasin
+Invoke-ParserCase "P-REGR-2-dims-mm" "120x80x45 mm kutu olustur" {
+  param($s, $q)
+  $b = $s.components[0].base
+  $dOk = ([double]$b.width_mm -eq 120 -and [double]$b.depth_mm -eq 80 -and [double]$b.height_mm -eq 45)
+  $noDimsQ = (@($q | Where-Object { $_.kind -eq "dims" }).Count -eq 0)
+  $ok = ($dOk -and $noDimsQ)
+  return @{ ok = $ok; detail = $(if ($ok) { "120x80x45 mm parse edildi, dims sorusu yok" } else { "w=$($b.width_mm) d=$($b.depth_mm) h=$($b.height_mm) noDimsQ=$noDimsQ" }) }
+}
+
+# P-REGR-3: "120x80x45 mm olculerinde" (takip eden kelimelerle) -> dims sorusu olusmasin
+Invoke-ParserCase "P-REGR-3-dims-olculerinde" "120x80x45 mm olculerinde ustu acik bir kutu olustur" {
+  param($s, $q)
+  $b = $s.components[0].base
+  $dOk = ([double]$b.width_mm -eq 120 -and [double]$b.depth_mm -eq 80 -and [double]$b.height_mm -eq 45)
+  $noDimsQ = (@($q | Where-Object { $_.kind -eq "dims" }).Count -eq 0)
+  $ok = ($dOk -and $noDimsQ)
+  return @{ ok = $ok; detail = $(if ($ok) { "120x80x45 mm olculerinde parse edildi, dims sorusu yok" } else { "w=$($b.width_mm) d=$($b.depth_mm) h=$($b.height_mm) noDimsQ=$noDimsQ" }) }
+}
+
 $passed = @($results | Where-Object { $_.result -eq "PASS" }).Count
 Write-Output "----------------------------------------"
 Write-Output "PARSER SONUC: $passed / $($results.Count) test gecti"

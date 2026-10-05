@@ -8,7 +8,7 @@
       "integration": "CORE_CANDIDATE", "status": "READY",
       "adapter": "adapters/TrimeshAdapter.ps1",
       "capabilities": ["Analyze", "Measure"],
-      "requirements": { "python": "3D-AI-External/envs/python312", "packages": ["numpy", "trimesh"] },
+      "requirements": { "python": "3D-AI-External/envs/python312", "packages": ["numpy", "trimesh", "networkx"] },
       "notes": "Isolated env, numpy-only hard dep."
     },
     {
